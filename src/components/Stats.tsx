@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Chart as ChartJS, 
   ArcElement, 
@@ -48,6 +49,7 @@ export default function Stats() {
   const [showConfetti, setShowConfetti] = useState(false);
   const isDarkMode = useDarkMode();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   
   // Estado para controlar a tooltip
   const [tooltip, setTooltip] = useState({ 
@@ -539,6 +541,11 @@ export default function Stats() {
   const formattedGoalEndDate = weeklyGoalEndDate 
     ? format(parseISO(weeklyGoalEndDate), "dd 'de' MMMM", { locale: pt })
     : "Definir Meta"; // Texto placeholder se a data não estiver definida
+
+  // Adicione esta linha para definir o isClient
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   return (
     <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-8 relative">
@@ -1035,14 +1042,14 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Tooltip global controlado por React */}
-      {tooltip.show && (
+      {/* Renderizar a tooltip via Portal se estiver no cliente */}
+      {isClient && tooltip.show && createPortal(
         <div 
           className="fixed z-[9999] px-3 py-2 rounded-md text-sm pointer-events-none"
           style={{
             left: `${tooltip.x}px`,
-            top: `${tooltip.y - 60}px`, // Aumentado para 60px acima do cursor
-            transform: 'translate(-50%, 0)', // Apenas centralizar horizontalmente
+            top: `${tooltip.y - 60}px`,
+            transform: 'translate(-50%, 0)',
             backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             color: isDarkMode ? '#e5e7eb' : '#1f2937',
             border: `1px solid ${isDarkMode ? '#4b5563' : '#e5e7eb'}`,
@@ -1052,7 +1059,8 @@ export default function Stats() {
           }}
         >
           {tooltip.text}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal de confirmação */}
@@ -1298,17 +1306,21 @@ export default function Stats() {
           background-color: ${isDarkMode ? '#6b7280' : '#94a3b8'};
         }
 
-        /* Garante que o container pai não bloqueia tooltips */
-        .github-style-heatmap,
+        /* Remover as regras de overflow: visible !important adicionadas anteriormente */
+        /* .github-style-heatmap,
         .heatmap-scroll-container,
         .days-and-grid-container,
         .days-grid {
           overflow: visible !important;
-        }
+        } */
         
-        /* Garante que o card pai também não bloqueia as tooltips */
-        .bg-gray-50.dark\\:bg-gray-700.p-4.rounded-lg.lg\\:col-span-2.flex.flex-col.items-center {
+        /* Remover as regras de overflow: visible !important adicionadas anteriormente */
+        /* .bg-gray-50.dark\\:bg-gray-700.p-4.rounded-lg.lg\\:col-span-2.flex.flex-col.items-center {
           overflow: visible !important;
+        } */
+        
+        @keyframes fadeIn {
+          // ... existing code ...
         }
       `}</style>
     </div>
