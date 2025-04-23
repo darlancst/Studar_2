@@ -49,6 +49,14 @@ export default function Stats() {
   const isDarkMode = useDarkMode();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
+  // Estado para controlar a tooltip
+  const [tooltip, setTooltip] = useState({ 
+    show: false, 
+    text: '', 
+    x: 0, 
+    y: 0 
+  });
+  
   // Tamanhos para o heatmap (definidos no escopo do componente)
   const heatmapCellSize = 11; // Tamanho do quadrado em pixels
   const heatmapCellGap = 2; // Espaçamento entre células
@@ -942,7 +950,7 @@ export default function Stats() {
                             
                             const minutes = dayData?.minutes || 0;
                             const isToday = dayData?.isToday || false;
-                            const dayNumber = dayDate.getDate(); // Obtém o número do dia
+                            const tooltip = dayData?.tooltip || '';
                             
                             return (
                               <div 
@@ -953,10 +961,31 @@ export default function Stats() {
                                   gridRow: dayOfWeek + 1,
                                   gridColumn: weekIndex + 1
                                 }}
-                                aria-label={dayData?.tooltip || ''}
-                                data-tooltip={dayData?.tooltip || ''}
-                              >
-                              </div>
+                                aria-label={tooltip}
+                                data-tooltip={tooltip}
+                                onMouseEnter={(e: React.MouseEvent) => {
+                                  const tooltipText = e.currentTarget.getAttribute('data-tooltip') || '';
+                                  setTooltip({
+                                    show: true,
+                                    text: tooltipText,
+                                    x: e.clientX,
+                                    y: e.clientY - 10
+                                  });
+                                }}
+                                onMouseMove={(e: React.MouseEvent) => {
+                                  setTooltip(prev => ({
+                                    ...prev,
+                                    x: e.clientX,
+                                    y: e.clientY - 10
+                                  }));
+                                }}
+                                onMouseLeave={() => {
+                                  setTooltip(prev => ({
+                                    ...prev,
+                                    show: false
+                                  }));
+                                }}
+                              ></div>
                             );
                           })
                         )).flat()}
@@ -1005,6 +1034,26 @@ export default function Stats() {
           </div>
         </div>
       </div>
+
+      {/* Tooltip global controlado por React */}
+      {tooltip.show && (
+        <div 
+          className="fixed z-[9999] px-3 py-2 rounded-md text-sm pointer-events-none"
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y}px`,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            color: isDarkMode ? '#e5e7eb' : '#1f2937',
+            border: `1px solid ${isDarkMode ? '#4b5563' : '#e5e7eb'}`,
+            boxShadow: `0 3px 10px ${isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'}`,
+            maxWidth: '300px',
+            whiteSpace: 'normal'
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
 
       {/* Modal de confirmação */}
       {showResetConfirm && (
@@ -1139,6 +1188,7 @@ export default function Stats() {
           transition: all 0.2s ease;
           position: relative;
           ${isDarkMode ? 'backdrop-filter: blur(8px);' : ''}
+          cursor: pointer;
         }
 
         .day-cell.outside-range {
@@ -1185,31 +1235,11 @@ export default function Stats() {
           }
         }
         
-        .day-cell:hover::after {
-          content: attr(data-tooltip);
-          position: absolute;
-          bottom: calc(100% + 5px);
-          left: 50%;
-          transform: translateX(-50%);
-          background-color: ${isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)'};
-          color: ${isDarkMode ? '#e5e7eb' : '#1f2937'};
-          padding: 5px 10px;
-          border-radius: 4px;
-          white-space: nowrap;
-          font-size: 12px;
-          z-index: 10;
-          pointer-events: none;
-          box-shadow: 0 2px 10px ${isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'};
-          border: 1px solid ${isDarkMode ? '#4b5563' : '#e5e7eb'};
-          opacity: 0;
-          animation: fadeIn 0.2s ease-in-out forwards;
+        /* Adicionar um estilo para tooltip global que será adicionado ao body */
+        #global-tooltip {
+          display: none; /* Escondemos o antigo */
         }
         
-        @keyframes fadeIn {
-          0% { opacity: 0; transform: translate(-50%, 10px); }
-          100% { opacity: 1; transform: translate(-50%, 0); }
-        }
-
         .color-scale-legend {
           display: flex;
           align-items: center;
@@ -1266,6 +1296,19 @@ export default function Stats() {
         
         .heatmap-scroll-container::-webkit-scrollbar-thumb:hover {
           background-color: ${isDarkMode ? '#6b7280' : '#94a3b8'};
+        }
+
+        /* Garante que o container pai não bloqueia tooltips */
+        .github-style-heatmap,
+        .heatmap-scroll-container,
+        .days-and-grid-container,
+        .days-grid {
+          overflow: visible !important;
+        }
+        
+        /* Garante que o card pai também não bloqueia as tooltips */
+        .bg-gray-50.dark\\:bg-gray-700.p-4.rounded-lg.lg\\:col-span-2.flex.flex-col.items-center {
+          overflow: visible !important;
         }
       `}</style>
     </div>
