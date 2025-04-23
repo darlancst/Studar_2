@@ -1041,7 +1041,7 @@ export default function Stats() {
           className="fixed z-[9999] px-3 py-2 rounded-md text-sm pointer-events-none"
           style={{
             left: `${tooltip.x}px`,
-            top: `${tooltip.y + 10}px`, // Reduzido para apenas 10px abaixo do cursor
+            top: `${tooltip.y - 10}px`, // Revertido para 10px acima do cursor
             transform: 'translate(-50%, 0)', // Apenas centralizar horizontalmente
             backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             color: isDarkMode ? '#e5e7eb' : '#1f2937',
