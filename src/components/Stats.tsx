@@ -969,14 +969,14 @@ export default function Stats() {
                                     show: true,
                                     text: tooltipText,
                                     x: e.clientX,
-                                    y: e.clientY - 10
+                                    y: e.clientY
                                   });
                                 }}
                                 onMouseMove={(e: React.MouseEvent) => {
                                   setTooltip(prev => ({
                                     ...prev,
                                     x: e.clientX,
-                                    y: e.clientY - 10
+                                    y: e.clientY
                                   }));
                                 }}
                                 onMouseLeave={() => {
@@ -1042,7 +1042,7 @@ export default function Stats() {
           style={{
             left: `${tooltip.x}px`,
             top: `${tooltip.y}px`,
-            transform: 'translate(-50%, -100%)',
+            transform: 'translate(-50%, -120%)',
             backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             color: isDarkMode ? '#e5e7eb' : '#1f2937',
             border: `1px solid ${isDarkMode ? '#4b5563' : '#e5e7eb'}`,
