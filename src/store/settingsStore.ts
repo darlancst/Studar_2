@@ -1,0 +1,148 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { usePomodoroStore } from './pomodoroStore';
+import { useDatesStore } from './datesStore';
+import { addDays, formatISO } from 'date-fns'; // Importar funções de data
+
+// Interface para os limiares de tempo do heatmap
+export interface HeatmapThresholds {
+  level1: number; // 0-level1 minutos (cor mais clara)
+  level2: number; // level1-level2 minutos
+  level3: number; // level2-level3 minutos
+  level4: number; // level3-level4 minutos
+  level5: number; // level4-level5 minutos
+  // >level5 é a cor mais escura
+}
+
+interface SettingsState {
+  // Tema
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+  
+  // Meta semanal de estudo (em minutos)
+  weeklyGoal: number;
+  weeklyGoalEndDate: string | null; // NOVA: Data final da meta (ISO string)
+  setWeeklyGoal: (minutes: number) => void;
+  
+  // Intervalos de revisão (em dias)
+  reviewIntervals: number[];
+  setReviewIntervals: (intervals: number[]) => void;
+  
+  // Limiares de tempo para as cores do heatmap (em minutos)
+  heatmapThresholds: HeatmapThresholds;
+  setHeatmapThresholds: (thresholds: HeatmapThresholds) => void;
+  
+  // Funções de Reset
+  resetStats: () => void;
+  resetPomodoros: () => void; 
+  resetAllData: () => void;
+}
+
+// Limiares padrão para as cores do heatmap
+const DEFAULT_HEATMAP_THRESHOLDS: HeatmapThresholds = {
+  level1: 30,  // 0-30 minutos (azul mais claro)
+  level2: 60,  // 30-60 minutos
+  level3: 120, // 1-2 horas
+  level4: 180, // 2-3 horas
+  level5: 240, // 3-4 horas
+  // >240 minutos (4+ horas) é a cor mais escura
+};
+
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set, get) => ({
+      // Estado inicial
+      darkMode: false,
+      weeklyGoal: 600, // 10 horas por semana (padrão)
+      weeklyGoalEndDate: null, // Inicializa como null
+      reviewIntervals: [1, 7, 30], // Intervalos padrão (1, 7 e 30 dias)
+      heatmapThresholds: DEFAULT_HEATMAP_THRESHOLDS, // Limiares padrão
+      
+      // Alterna entre tema claro e escuro
+      toggleDarkMode: () => {
+        const newDarkMode = !get().darkMode;
+        
+        // Aplica a classe na tag <html> para habilitar/desabilitar o dark mode
+        if (newDarkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+        
+        set({ darkMode: newDarkMode });
+      },
+      
+      // Define a meta semanal de estudo E a data final
+      setWeeklyGoal: (minutes: number) => {
+        const newEndDate = addDays(new Date(), 7); // Calcula data daqui a 7 dias
+        const newEndDateISO = formatISO(newEndDate); // Formata como string ISO
+        set({ 
+          weeklyGoal: minutes, 
+          weeklyGoalEndDate: newEndDateISO // Salva a nova data final
+        });
+      },
+      
+      // Define os intervalos de revisão personalizados
+      setReviewIntervals: (intervals: number[]) => {
+        // Garante que os intervalos estão em ordem crescente
+        const sortedIntervals = [...intervals].sort((a, b) => a - b);
+        set({ reviewIntervals: sortedIntervals });
+      },
+      
+      // Define os limiares de tempo para as cores do heatmap
+      setHeatmapThresholds: (thresholds: HeatmapThresholds) => {
+        set({ heatmapThresholds: thresholds });
+      },
+      
+      // Reset das estatísticas
+      resetStats: () => {
+        // Não precisamos mais chamar o statsStore pois não existe uma função resetAllStats
+        
+        // Limpa datas de estudo
+        const datesStore = useDatesStore.getState();
+        if (datesStore && typeof datesStore.resetDates === 'function') {
+          datesStore.resetDates();
+        }
+      },
+      
+      // Reset dos pomodoros completados
+      resetPomodoros: () => {
+        const pomodoroStore = usePomodoroStore.getState();
+        if (pomodoroStore) {
+          // Reseta o contador de pomodoros completados
+          usePomodoroStore.setState({ completedPomodoros: 0 });
+        }
+      },
+      
+      // Reset de todos os dados
+      resetAllData: () => {
+        const { resetStats, resetPomodoros } = get();
+        resetStats();
+        resetPomodoros();
+        
+        // Limpa as sessões do Pomodoro
+        usePomodoroStore.setState({ sessions: [] });
+        
+        // Garante que as datas de estudo também sejam limpas
+        const datesStore = useDatesStore.getState();
+        if (datesStore && typeof datesStore.resetDates === 'function') {
+          datesStore.resetDates();
+        }
+      },
+    }),
+    {
+      name: 'settings-storage',
+    }
+  )
+);
+
+// Inicializa o tema quando o app carrega
+if (typeof window !== 'undefined') {
+  // Se estiver no browser, aplica o tema salvo
+  const isDark = JSON.parse(localStorage.getItem('settings-storage') || '{"state":{"darkMode":false}}').state.darkMode;
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+} 

@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 199 89% 48%;
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 199 89% 48%;
+  }
+}
+
+/* Estilos básicos */
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
+
+/* Estilos personalizados para o calendário */
+.calendar-day {
+  @apply h-24 border border-gray-200 p-1 transition-colors hover:bg-gray-50;
+}
+
+.calendar-day-header {
+  @apply text-xs font-medium text-gray-500;
+}
+
+.calendar-day-content {
+  @apply mt-1 overflow-y-auto max-h-20;
+}
+
+.calendar-day-topic {
+  @apply text-xs p-1 mb-1 rounded truncate;
+}
+
+.calendar-day-review {
+  @apply text-xs p-1 mb-1 bg-yellow-100 border-l-4 border-yellow-400 rounded truncate;
+}
+
+.calendar-day-review.completed {
+  @apply bg-green-100 border-green-400;
+}
+
+/* Estilos para timer Pomodoro */
+.timer-display {
+  @apply text-6xl font-bold text-center py-10;
+}
+
+.timer-controls {
+  @apply flex justify-center space-x-4 my-5;
+}
+
+.timer-button {
+  @apply px-6 py-2 rounded-full font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+/* Cores para as matérias */
+.subject-colors {
+  @apply grid grid-cols-5 gap-2 mt-2;
+}
+
+.color-option {
+  @apply w-8 h-8 rounded-full cursor-pointer border-2 border-transparent transition-all hover:scale-110;
+}
+
+.color-option.selected {
+  @apply border-gray-900 shadow-md;
+} 
