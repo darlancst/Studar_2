@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware';
 import { usePomodoroStore } from './pomodoroStore';
 import { useDatesStore } from './datesStore';
 import { addDays, formatISO } from 'date-fns'; // Importar funções de data
+import { useSubjectStore } from './subjectStore';
+import { useTopicStore } from './topicStore';
+import { useReviewStore } from './reviewStore';
 
 // Interface para os limiares de tempo do heatmap
 export interface HeatmapThresholds {
@@ -96,8 +99,6 @@ export const useSettingsStore = create<SettingsState>()(
       
       // Reset das estatísticas
       resetStats: () => {
-        // Não precisamos mais chamar o statsStore pois não existe uma função resetAllStats
-        
         // Limpa datas de estudo
         const datesStore = useDatesStore.getState();
         if (datesStore && typeof datesStore.resetDates === 'function') {
@@ -105,29 +106,39 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
       
-      // Reset dos pomodoros completados
+      // Reset dos pomodoros completados e sessões
       resetPomodoros: () => {
-        const pomodoroStore = usePomodoroStore.getState();
-        if (pomodoroStore) {
-          // Reseta o contador de pomodoros completados
-          usePomodoroStore.setState({ completedPomodoros: 0 });
-        }
+        usePomodoroStore.setState({
+          completedPomodoros: 0,
+          sessions: [], // Limpa sessões aqui
+        });
       },
       
       // Reset de todos os dados
       resetAllData: () => {
         const { resetStats, resetPomodoros } = get();
-        resetStats();
-        resetPomodoros();
-        
-        // Limpa as sessões do Pomodoro
-        usePomodoroStore.setState({ sessions: [] });
-        
-        // Garante que as datas de estudo também sejam limpas
-        const datesStore = useDatesStore.getState();
-        if (datesStore && typeof datesStore.resetDates === 'function') {
-          datesStore.resetDates();
+        resetStats();     // Limpa datas
+        resetPomodoros(); // Limpa contador e sessões do pomodoro
+
+        // Limpa Matérias
+        const subjectStore = useSubjectStore.getState();
+        if (subjectStore && typeof subjectStore.resetSubjects === 'function') {
+          subjectStore.resetSubjects();
         }
+
+        // Limpa Tópicos
+        const topicStore = useTopicStore.getState();
+        if (topicStore && typeof topicStore.resetTopics === 'function') {
+          topicStore.resetTopics();
+        }
+
+        // Limpa Revisões
+        const reviewStore = useReviewStore.getState();
+        if (reviewStore && typeof reviewStore.resetReviews === 'function') {
+          reviewStore.resetReviews();
+        }
+
+        console.log("Todos os dados resetados (incluindo matérias, tópicos, revisões, sessões e datas).");
       },
     }),
     {

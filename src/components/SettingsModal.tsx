@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { XMarkIcon, SunIcon, MoonIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { 
+  XMarkIcon, 
+  SunIcon, 
+  MoonIcon, 
+  PlusIcon, 
+  TrashIcon,
+  ClockIcon,
+  CalendarIcon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  PaintBrushIcon,
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+  CheckIcon
+} from '@heroicons/react/24/outline';
 import { useSettingsStore, HeatmapThresholds } from '@/store/settingsStore';
 
 interface SettingsModalProps {
@@ -10,6 +24,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetAction, setResetAction] = useState<'stats' | 'all'>('all');
   const { 
     darkMode, 
     toggleDarkMode, 
@@ -109,7 +124,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   // Função para resetar todas as estatísticas
-  const handleResetAllStats = () => {
+  const handleResetStats = () => {
     resetStats();
     setShowResetConfirm(false);
   };
@@ -125,11 +140,27 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     setShowResetConfirm(false);
   };
 
+  const handleShowResetConfirm = (type: 'stats' | 'all') => {
+    setResetAction(type);
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = () => {
+    if (resetAction === 'stats') {
+      handleResetStats();
+    } else {
+      handleResetAllData();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-gray-700 bg-opacity-50 dark:bg-black dark:bg-opacity-60 overflow-y-auto flex justify-center items-center">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <h2 className="text-xl font-semibold dark:text-white">Configurações</h2>
+          <div className="flex items-center">
+            <Cog6ToothIcon className="h-6 w-6 mr-2 text-gray-700 dark:text-gray-300" />
+            <h2 className="text-xl font-semibold dark:text-white">Configurações</h2>
+          </div>
           <button 
             onClick={onClose} 
             className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
@@ -138,10 +169,13 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           </button>
         </div>
 
-        <div className="p-6 space-y-8">
+        <div className="p-6 space-y-6">
           {/* Seção de Aparência */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Aparência</h3>
+          <div className="pb-4 border-b dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <PaintBrushIcon className="h-5 w-5 mr-2 text-indigo-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Aparência</h3>
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-700 dark:text-gray-300">Tema</span>
               <button
@@ -164,9 +198,12 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           </div>
           
           {/* Seção de Metas */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Metas</h3>
-            <div className="space-y-6">
+          <div className="pb-4 border-b dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <ChartBarIcon className="h-5 w-5 mr-2 text-green-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Metas</h3>
+            </div>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Meta semanal de estudo
@@ -204,8 +241,9 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   <button
                     type="button"
                     onClick={handleUpdateWeeklyGoal}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   >
+                    <CheckIcon className="h-4 w-4 mr-1" />
                     Salvar
                   </button>
                 </div>
@@ -214,8 +252,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           </div>
           
           {/* Seção de Revisões */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Intervalos de Revisão</h3>
+          <div className="pb-4 border-b dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <CalendarIcon className="h-5 w-5 mr-2 text-blue-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Intervalos de Revisão</h3>
+            </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -263,12 +304,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           </div>
           
           {/* Seção de personalização das cores do Histórico de Atividades */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Histórico de Atividades</h3>
-            <div className="space-y-6">
+          <div className="pb-4 border-b dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <PaintBrushIcon className="h-5 w-5 mr-2 text-purple-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Histórico de Atividades</h3>
+            </div>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Personalizar cores conforme o tempo de estudo (em minutos):
+                  Personalizar cores conforme o tempo de estudo:
                 </label>
                 
                 <div className="space-y-4">
@@ -382,14 +426,16 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <div className="flex justify-end space-x-3 mt-4">
                   <button
                     onClick={handleResetThresholds}
-                    className="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm"
+                    className="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm flex items-center"
                   >
+                    <ArrowPathIcon className="h-4 w-4 mr-1" />
                     Resetar
                   </button>
                   <button
                     onClick={handleSaveThresholds}
-                    className="px-3 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 text-sm"
+                    className="px-3 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 text-sm flex items-center"
                   >
+                    <CheckIcon className="h-4 w-4 mr-1" />
                     Salvar
                   </button>
                 </div>
@@ -399,33 +445,45 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           
           {/* Seção de Reset de Dados */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Dados e Estatísticas</h3>
+            <div className="flex items-center mb-4">
+              <ArrowPathIcon className="h-5 w-5 mr-2 text-red-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Dados e Estatísticas</h3>
+            </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-700 dark:text-gray-300">Pomodoros</span>
+                <div className="flex items-center">
+                  <ClockIcon className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Pomodoros</span>
+                </div>
                 <button
                   onClick={handleResetPomodoros}
-                  className="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm"
+                  className="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm flex items-center"
                 >
+                  <ArrowPathIcon className="h-4 w-4 mr-1" />
                   Reiniciar contagem
                 </button>
               </div>
               
               <div className="flex items-center justify-between">
-                <span className="text-gray-700 dark:text-gray-300">Estatísticas</span>
+                <div className="flex items-center">
+                  <ChartBarIcon className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Estatísticas</span>
+                </div>
                 <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-3 py-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/30 text-sm"
+                  onClick={() => handleShowResetConfirm('stats')}
+                  className="px-3 py-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/30 text-sm flex items-center"
                 >
+                  <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
                   Reiniciar estatísticas
                 </button>
               </div>
               
-              <div className="border-t dark:border-gray-700 pt-4">
+              <div className="border-t dark:border-gray-700 pt-4 mt-4">
                 <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="w-full px-4 py-2 rounded-md bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/30"
+                  onClick={() => handleShowResetConfirm('all')}
+                  className="w-full px-4 py-2 rounded-md bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/30 flex items-center justify-center"
                 >
+                  <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
                   Reiniciar todos os dados
                 </button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -441,22 +499,31 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       {showResetConfirm && (
         <div className="fixed inset-0 z-50 bg-gray-700 bg-opacity-50 dark:bg-black dark:bg-opacity-60 flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4 dark:text-white">Reiniciar Dados</h3>
+            <h3 className="text-lg font-semibold mb-4 dark:text-white text-red-600 dark:text-red-400 flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+              {resetAction === 'stats' ? 'Reiniciar Estatísticas' : 'Reiniciar Todos os Dados'}
+            </h3>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
-              Esta ação vai reiniciar seus dados e não pode ser desfeita. Tem certeza?
+              {resetAction === 'stats' ? (
+                <>Tem certeza que deseja reiniciar todas as estatísticas? Isso <strong className="font-bold text-red-600 dark:text-red-400">excluirá permanentemente</strong> todos os seus registros de estudo e progresso. Esta ação não pode ser desfeita.</>
+              ) : (
+                <>Tem certeza que deseja reiniciar todos os dados? Isso <strong className="font-bold text-red-600 dark:text-red-400">excluirá permanentemente</strong> todas as suas matérias, tópicos, revisões, sessões de estudo e estatísticas. Esta ação não pode ser desfeita.</>
+              )}
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center"
               >
+                <XMarkIcon className="h-4 w-4 mr-1" />
                 Cancelar
               </button>
               <button
-                onClick={handleResetAllData}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                onClick={handleConfirmReset}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center"
               >
-                Reiniciar
+                <CheckIcon className="h-4 w-4 mr-1" />
+                Sim, Reiniciar
               </button>
             </div>
           </div>

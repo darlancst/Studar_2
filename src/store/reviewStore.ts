@@ -6,11 +6,12 @@ import { Review } from '@/types';
 interface ReviewState {
   reviews: Review[];
   addReview: (topicId: string, scheduledDate: Date) => void;
-  markAsCompleted: (id: string) => void;
+  toggleReviewCompletion: (id: string) => void;
   deleteReview: (id: string) => void;
   deleteReviewsByTopicId: (topicId: string) => void;
   getReviewsByDate: (date: Date) => Review[];
   getPendingReviewsByDate: (date: Date) => Review[];
+  resetReviews: () => void;
 }
 
 export const useReviewStore = create<ReviewState>()(
@@ -23,16 +24,25 @@ export const useReviewStore = create<ReviewState>()(
           topicId,
           scheduledDate,
           completed: false,
+          date: scheduledDate,
         };
         set((state) => ({
           reviews: [...state.reviews, newReview],
         }));
       },
-      markAsCompleted: (id) => {
+      toggleReviewCompletion: (id) => {
         set((state) => ({
-          reviews: state.reviews.map((review) =>
-            review.id === id ? { ...review, completed: true } : review
-          ),
+          reviews: state.reviews.map((review) => {
+            if (review.id === id) {
+              const isNowCompleted = !review.completed;
+              return {
+                ...review,
+                completed: isNowCompleted,
+                date: isNowCompleted ? new Date() : review.scheduledDate 
+              };
+            }
+            return review;
+          }),
         }));
       },
       deleteReview: (id) => {
@@ -59,6 +69,9 @@ export const useReviewStore = create<ReviewState>()(
       },
       getPendingReviewsByDate: (date) => {
         return get().getReviewsByDate(date).filter((review) => !review.completed);
+      },
+      resetReviews: () => {
+        set({ reviews: [] });
       },
     }),
     {

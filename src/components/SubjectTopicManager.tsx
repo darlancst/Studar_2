@@ -10,26 +10,59 @@ interface SubjectTopicManagerProps {
   onClose: () => void;
 }
 
+// Constantes para paginação de tópicos
+const INITIAL_TOPIC_LIMIT = 10;
+const TOPIC_INCREMENT = 10;
+
 export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProps) {
   const [activeTab, setActiveTab] = useState<'subjects' | 'topics'>('subjects');
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   
-  // Formulários
+  // Estado para controlar quantos tópicos são visíveis
+  const [visibleTopicCount, setVisibleTopicCount] = useState(INITIAL_TOPIC_LIMIT);
+  
+  // Busca a lista de matérias antes de definir a cor inicial
+  const { subjects, addSubject, updateSubject, deleteSubject } = useSubjectStore();
+  
+  // Colors para matérias (paleta completa)
+  const allColors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+    '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#84CC16',
+    '#9333EA', '#2563EB', '#059669', '#B91C1C', '#FB7185'
+  ];
+
+  // Obtém as cores já utilizadas por OUTRAS matérias
+  const usedColorsByOthers = subjects
+    .filter(subject => !editingSubject || subject.id !== editingSubject.id) 
+    .map(subject => subject.color);
+    
+  // Encontra a primeira cor disponível - reutilizável
+  const getFirstAvailableColor = () => {
+    return allColors.find(color => !usedColorsByOthers.includes(color)) || allColors[0];
+  };
+  
+  // Agora inicializamos com a primeira cor disponível, não uma cor fixa
+  // Usando uma função no useState para garantir que é calculado apenas uma vez na montagem
   const [subjectName, setSubjectName] = useState('');
-  const [subjectColor, setSubjectColor] = useState('#3B82F6');
+  const [subjectColor, setSubjectColor] = useState(() => getFirstAvailableColor());
   const [topicTitle, setTopicTitle] = useState('');
   const [topicDescription, setTopicDescription] = useState('');
   const [topicSubjectId, setTopicSubjectId] = useState('');
   
-  const { subjects, addSubject, updateSubject, deleteSubject } = useSubjectStore();
   const { topics, addTopic, updateTopic, deleteTopic } = useTopicStore();
   
-  // Colors para matérias
-  const colors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-    '#EC4899', '#06B6D4', '#F97316', '#6366F1'
-  ];
+  // Ordena as cores para colocar as indisponíveis no final
+  const sortedColors = [...allColors].sort((a, b) => {
+    const isAUsedByOther = usedColorsByOthers.includes(a);
+    const isBUsedByOther = usedColorsByOthers.includes(b);
+    // Se 'a' está usada e 'b' não, 'a' vem depois (retorna positivo)
+    if (isAUsedByOther && !isBUsedByOther) return 1;
+    // Se 'b' está usada e 'a' não, 'b' vem depois (retorna negativo)
+    if (!isAUsedByOther && isBUsedByOther) return -1;
+    // Caso contrário, mantém a ordem original
+    return 0; 
+  });
   
   // Manipuladores de formulário
   const handleSubjectSubmit = (e: React.FormEvent) => {
@@ -41,7 +74,17 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
       addSubject(subjectName, subjectColor);
     }
     setSubjectName('');
-    setSubjectColor('#3B82F6');
+    
+    // Após adicionar a matéria, encontra a primeira cor disponível
+    // Primeiro obtém as cores usadas por todas as matérias (incluindo a que acabou de ser adicionada)
+    const updatedUsedColors = [...subjects, ...(editingSubject ? [] : [{ color: subjectColor }])]
+      .map(subject => subject.color);
+    
+    // Encontra a primeira cor disponível na lista ordenada
+    const firstAvailableColor = allColors.find(color => !updatedUsedColors.includes(color)) || allColors[0];
+    
+    // Define o campo de cor para a primeira cor disponível
+    setSubjectColor(firstAvailableColor);
   };
   
   const handleTopicSubmit = (e: React.FormEvent) => {
@@ -118,14 +161,35 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
                       Cor
                     </label>
                     <div className="subject-colors">
-                      {colors.map((color) => (
+                      {/* Mapeia sobre as cores ORDENADAS */}
+                      {sortedColors.map((color) => {
+                        // Verifica se a cor está usada por OUTRA matéria
+                        const isUsedByOther = usedColorsByOthers.includes(color);
+                        // A cor está disponível para seleção se NÃO estiver usada por outra
+                        // OU se for a cor original da matéria que estamos editando
+                        const isAvailableForSelection = !isUsedByOther || (editingSubject && color === editingSubject.color);
+                        const isSelectedInForm = subjectColor === color;
+
+                        return (
                         <div
                           key={color}
-                          className={`color-option ${subjectColor === color ? 'selected' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setSubjectColor(color)}
+                            className={`
+                              color-option 
+                              ${isSelectedInForm ? 'selected' : ''}
+                              ${!isAvailableForSelection ? 'disabled-color' : ''} 
+                            `}
+                            style={{
+                              backgroundColor: isAvailableForSelection ? color : '#E5E7EB', // Cinza claro para indisponível
+                              cursor: isAvailableForSelection ? 'pointer' : 'not-allowed',
+                              opacity: isAvailableForSelection ? 1 : 0.6, // Reduz opacidade da indisponível
+                            }}
+                            // Só adiciona onClick se a cor estiver disponível
+                            onClick={isAvailableForSelection ? () => setSubjectColor(color) : undefined}
+                            title={!isAvailableForSelection ? 'Cor já em uso por outra matéria' : ''}
+                            aria-disabled={!isAvailableForSelection}
                         />
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -245,8 +309,20 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
               </form>
               
               <h3 className="font-medium mb-2 dark:text-white">Tópicos</h3>
+              
+              {/* Ordena os tópicos por data de criação (mais recentes primeiro) */}
+              {(() => {
+                const sortedTopics = [...topics].sort((a, b) => 
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+                
+                // Pega apenas a quantidade visível de tópicos
+                const visibleTopics = sortedTopics.slice(0, visibleTopicCount);
+
+                return (
+                  <>
               <div className="space-y-2">
-                {topics.map((topic) => {
+                      {visibleTopics.map((topic) => {
                   const subject = subjects.find((s) => s.id === topic.subjectId);
                   return (
                     <div
@@ -292,6 +368,23 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
                   );
                 })}
               </div>
+                    
+                    {/* Botão Carregar Mais (se houver mais tópicos) */}
+                    {sortedTopics.length > visibleTopicCount && (
+                      <div className="mt-4 text-center">
+                        <button
+                          onClick={() => setVisibleTopicCount(prevCount => 
+                            Math.min(prevCount + TOPIC_INCREMENT, sortedTopics.length)
+                          )}
+                          className="px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                        >
+                          Carregar Mais ({visibleTopicCount}/{sortedTopics.length})
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
         </div>

@@ -11,6 +11,7 @@ interface SubjectState {
   deleteSubject: (id: string) => void;
   getSubjectById: (id: string) => Subject | undefined;
   getSubjectsWithTopics: () => Subject[];
+  resetSubjects: () => void;
 }
 
 export const useSubjectStore = create<SubjectState>()(
@@ -56,6 +57,9 @@ export const useSubjectStore = create<SubjectState>()(
             topics: subjectTopics
           };
         });
+      },
+      resetSubjects: () => {
+        set({ subjects: [] });
       },
     }),
     {

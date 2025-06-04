@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 
@@ -63,36 +63,30 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
 
   return (
     <div className="fixed inset-0 z-50 bg-gray-700 bg-opacity-50 dark:bg-black dark:bg-opacity-60 overflow-y-auto flex justify-center items-center">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md m-4">
-        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[90vh]">
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold dark:text-white">
-            {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}
+            Detalhes de {format(date, "dd 'de' MMMM, yyyy", { locale: ptBR })}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="p-4">
-          {/* Cabeçalho da seção de tópicos com botão toggle */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Tópicos</h3>
+        <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}> 
+          {/* Seção de Tópicos */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Tópicos do dia</h3>
             <button 
-              onClick={() => setShowTopicForm(!showTopicForm)}
-              className="flex items-center text-sm font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
+                onClick={() => setShowTopicForm(prev => !prev)}
+                className="flex items-center px-3 py-1 bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300 text-sm rounded-md hover:bg-primary-200 dark:hover:bg-primary-800"
             >
-              {showTopicForm ? (
-                <span>Cancelar</span>
-              ) : (
-                <>
                   <PlusIcon className="h-4 w-4 mr-1" />
-                  <span>Novo tópico</span>
-                </>
-              )}
+                {showTopicForm ? 'Cancelar' : 'Adicionar Tópico'}
             </button>
           </div>
 
-          {/* Formulário para criar novo tópico */}
           {showTopicForm ? (
             <form onSubmit={handleCreateTopic} className="mb-6 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
               <div className="mb-3">
@@ -135,18 +129,21 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
                 <textarea
                   value={newTopicDescription}
                   onChange={(e) => setNewTopicDescription(e.target.value)}
+                    rows={2}
                   className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  placeholder="Digite uma descrição para o tópico"
-                  rows={3}
+                    placeholder="Descreva o conteúdo deste tópico..."
                 />
               </div>
               
+                <div className="flex justify-end">
               <button
                 type="submit"
-                className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md"
+                    disabled={!selectedSubjectId || !newTopicTitle.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Criar Tópico
               </button>
+                </div>
             </form>
           ) : (
             // Lista de tópicos existentes
@@ -180,6 +177,7 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
               )}
             </div>
           )}
+          </div>
 
           {/* Seção de revisões */}
           <div>
@@ -190,10 +188,16 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
                   const topic = allTopics.find(t => t.id === review.topicId);
                   const subject = topic ? subjects.find(s => s.id === topic.subjectId) : null;
                   
-                  // Cores para o modo escuro e claro para revisões completas e pendentes
-                  const completedClasses = review.completed 
+                  const isCompleted = review.completed;
+                  const completedClasses = isCompleted 
                     ? 'bg-green-50 border-l-4 border-green-400 dark:bg-green-900/30 dark:border-green-600' 
                     : 'bg-yellow-50 border-l-4 border-yellow-400 dark:bg-yellow-900/30 dark:border-yellow-600';
+                  
+                  const buttonClasses = isCompleted
+                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white' // Estilo para "Desfazer"
+                    : 'bg-green-600 hover:bg-green-700 text-white'; // Estilo para "Concluir"
+                    
+                  const buttonText = isCompleted ? 'Desfazer' : 'Concluir';
                   
                   return (
                     <div 
@@ -205,24 +209,23 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
                           {subject && (
                             <div 
                               className="w-3 h-3 rounded-full mr-2" 
-                              style={{ backgroundColor: subject.color }}
+                              style={{ backgroundColor: subject?.color }}
                             />
                           )}
-                          <span className="font-medium dark:text-white">{topic?.title}</span>
+                          <span className="font-medium dark:text-white">{topic?.title || 'Tópico não encontrado'}</span>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                          {review.completed ? 'Revisão concluída' : 'Revisão pendente'}
+                          {isCompleted ? 'Revisão concluída' : 'Revisão pendente'}
                         </p>
                       </div>
                       
-                      {!review.completed && (
+                      {/* Botão de Toggle */}
                         <button
-                          onClick={() => onCompleteReview(review.id)}
-                          className="ml-2 px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+                        onClick={() => onCompleteReview(review.id)} // Chama a função passada como prop
+                        className={`ml-2 px-3 py-1 text-sm rounded-md ${buttonClasses}`}
                         >
-                          Concluir
+                        {buttonText}
                         </button>
-                      )}
                     </div>
                   );
                 })}
@@ -246,13 +249,21 @@ export default function Calendar() {
   
   const { subjects } = useSubjectStore();
   const { topics } = useTopicStore();
-  const { reviews, markAsCompleted } = useReviewStore();
+  const { reviews, toggleReviewCompletion } = useReviewStore();
   const { darkMode } = useSettingsStore();
   
   // Dias do mês atual
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Determinar o primeiro e último dia da grade do calendário
+  // Começamos com o domingo anterior ao primeiro dia do mês
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  // Terminamos com o sábado após o último dia do mês
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  
+  // Gerar todos os dias a serem exibidos no calendário (incluindo dias de meses adjacentes)
+  const daysInGrid = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   // Dias da semana
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -296,13 +307,17 @@ export default function Calendar() {
   // Efeito para atualizar informações quando selecionar um novo dia
   useEffect(() => {
     updateSelectedDayInfo(selectedDate);
-  }, [selectedDate, topics, reviews]);
+  }, [selectedDate, topics]);
   
-  // Marca uma revisão como concluída
-  const handleCompleteReview = (reviewId: string) => {
-    markAsCompleted(reviewId);
-    // Atualiza as revisões após marcá-la como concluída
-    setDayReviews(getReviewsForDay(selectedDate));
+  // Atualiza para usar a função de toggle
+  const handleToggleReview = (reviewId: string) => {
+    toggleReviewCompletion(reviewId); 
+    // Força a atualização das revisões do dia selecionado para refletir a mudança no modal
+    setDayReviews(prevReviews => 
+      prevReviews.map(r => 
+        r.id === reviewId ? { ...r, completed: !r.completed, date: !r.completed ? new Date() : r.scheduledDate } : r
+      )
+    );
   };
 
   // Manipula o clique em um dia
@@ -359,12 +374,13 @@ export default function Calendar() {
         </div>
         
         <div className="grid grid-cols-7">
-          {daysInMonth.map((day, i) => {
+          {daysInGrid.map((day, i) => {
             const dayTopicsForCell = getTopicsForDay(day);
             const dayReviewsForCell = getReviewsForDay(day);
             const isSelected = isSameDay(day, selectedDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const hasEvents = dayTopicsForCell.length > 0 || dayReviewsForCell.length > 0;
+            const isToday = isSameDay(day, new Date());
             
             return (
               <div
@@ -372,8 +388,8 @@ export default function Calendar() {
                 onClick={() => handleDayClick(day)}
                 className={`calendar-day dark:border-gray-700 
                   ${isSelected ? 'bg-primary-50 border-primary-200 dark:bg-primary-900/30 dark:border-primary-800' : ''} 
-                  ${!isCurrentMonth ? 'text-gray-300 dark:text-gray-600' : 'dark:text-gray-300'} 
                   ${hasEvents ? 'cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20' : 'dark:hover:bg-gray-800'}
+                  ${isToday ? 'today-cell' : ''}
                 `}
                 style={{
                   position: 'relative',
@@ -381,13 +397,24 @@ export default function Calendar() {
                   overflow: 'hidden'
                 }}
               >
-                <div className="calendar-day-header dark:text-gray-400">
+                <div 
+                  className={`calendar-day-header ${isToday ? 'font-bold text-primary-600 dark:text-primary-400' : ''}`}
+                  style={{ 
+                    color: isToday 
+                      ? '' 
+                      : isCurrentMonth 
+                        ? darkMode ? 'white' : 'black' 
+                        : darkMode ? '#6b7280' : '#d1d5db'
+                  }}
+                >
                   {format(day, 'd')}
+                  {isToday && <div className="today-indicator"></div>}
                 </div>
                 
                 <div className="calendar-day-content" style={{ 
                   maxHeight: 'calc(100% - 20px)',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  opacity: isCurrentMonth ? '1' : '0.6'
                 }}>
                   {dayTopicsForCell.map((topic) => {
                     const subject = subjects.find((subj) => subj.id === topic.subjectId);
@@ -558,7 +585,7 @@ export default function Calendar() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCompleteReview(review.id);
+                              handleToggleReview(review.id);
                             }}
                             className="ml-2 text-xs bg-green-600 text-white px-1.5 py-0.5 rounded hover:bg-green-700"
                           >
@@ -586,10 +613,74 @@ export default function Calendar() {
           topics={dayTopics}
           reviews={dayReviews}
           onClose={() => setShowDayDetails(false)}
-          onCompleteReview={handleCompleteReview}
+          onCompleteReview={handleToggleReview}
           onTopicAdded={handleTopicAdded}
         />
       )}
+
+      <style jsx>{`
+        /* Estilo para células do calendário */
+        .calendar-day {
+          padding: 6px;
+          border-bottom: 1px solid #e5e7eb;
+          border-right: 1px solid #e5e7eb;
+          transition: background-color 0.2s;
+        }
+        
+        .calendar-day-header {
+          font-size: 0.875rem;
+          margin-bottom: 6px;
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        
+        /* Estilos para destacar o dia atual */
+        .today-cell {
+          box-shadow: inset 0 0 0 2.5px ${darkMode ? '#a855f7' : '#8b5cf6'};
+          background-color: ${darkMode ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.08)'};
+          position: relative;
+          z-index: 1;
+        }
+        
+        .today-cell::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 4px;
+          background: linear-gradient(90deg, ${darkMode ? '#8b5cf680' : '#8b5cf6'}, ${darkMode ? '#a855f780' : '#a855f7'});
+          z-index: 1;
+        }
+        
+        .today-indicator {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: ${darkMode ? '#a855f7' : '#8b5cf6'};
+          margin-left: 4px;
+          display: inline-block;
+          animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 ${darkMode ? 'rgba(168, 85, 247, 0.5)' : 'rgba(139, 92, 246, 0.5)'};
+          }
+          
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 4px ${darkMode ? 'rgba(168, 85, 247, 0)' : 'rgba(139, 92, 246, 0)'};
+          }
+          
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 ${darkMode ? 'rgba(168, 85, 247, 0)' : 'rgba(139, 92, 246, 0)'};
+          }
+        }
+      `}</style>
     </div>
   );
 } 

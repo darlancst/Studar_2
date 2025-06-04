@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Chart as ChartJS, 
   ArcElement, 
@@ -11,7 +11,8 @@ import {
   PointElement,
   LineElement,
   BarElement,
-  Title
+  Title,
+  TooltipItem
 } from 'chart.js';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { useSubjectStore } from '@/store/subjectStore';
@@ -23,7 +24,6 @@ import { format, subDays, startOfToday, endOfToday, isSameDay, parseISO, startOf
 import { pt } from 'date-fns/locale';
 import { Subject, Review, PomodoroSession, Topic } from '@/types';
 import { useDarkMode } from '@/hooks/useDarkMode';
-import HeatMap from '@uiw/react-heat-map';
 
 // Registrando os componentes necessários
 ChartJS.register(
@@ -40,6 +40,9 @@ ChartJS.register(
 
 type StatsPeriod = 'today' | 'week' | 'month' | 'annual' | 'custom';
 
+// Tipos para os detalhes das atividades
+type DailyActivity = PomodoroSession | Review;
+
 export default function Stats() {
   const [period, setPeriod] = useState<StatsPeriod>('today');
   const [customStartDate, setCustomStartDate] = useState<Date>(startOfToday());
@@ -48,6 +51,9 @@ export default function Stats() {
   const [showConfetti, setShowConfetti] = useState(false);
   const isDarkMode = useDarkMode();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  const heatmapScrollRef = useRef<HTMLDivElement>(null);
   
   // Estado para controlar a tooltip
   const [tooltip, setTooltip] = useState({ 
@@ -57,6 +63,10 @@ export default function Stats() {
     y: 0 
   });
   
+  // Estado para detalhes da célula clicada
+  const [selectedDateDetails, setSelectedDateDetails] = useState<Date | null>(null);
+  const [selectedActivities, setSelectedActivities] = useState<DailyActivity[]>([]);
+  
   // Tamanhos para o heatmap (definidos no escopo do componente)
   const heatmapCellSize = 11; // Tamanho do quadrado em pixels
   const heatmapCellGap = 2; // Espaçamento entre células
@@ -65,13 +75,70 @@ export default function Stats() {
   const { heatmapThresholds } = useSettingsStore();
   
   const { getSubjectsWithTopics } = useSubjectStore();
-  const { sessions: pomodoroSessions } = usePomodoroStore();
+  const { 
+    sessions: pomodoroSessions, 
+    isRunning, 
+    currentTopicId, 
+    elapsedSeconds 
+  } = usePomodoroStore();
   const { reviews } = useReviewStore();
   const { getDates } = useDatesStore();
-  const { isRunning, currentTopicId, getCurrentSessionTime } = usePomodoroStore();
   const { resetStats, resetPomodoros, weeklyGoal, weeklyGoalEndDate } = useSettingsStore();
   
   const subjects = getSubjectsWithTopics();
+  
+  useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768); // Defina o breakpoint que considerar mobile, ex: 768px
+    };
+    checkMobileView();
+    window.addEventListener('resize', checkMobileView);
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
+  
+  // Efeito para rolar o heatmap para a direita em mobile
+  useEffect(() => {
+    if (isMobileView && heatmapScrollRef.current) {
+      const container = heatmapScrollRef.current;
+      console.log('[HeatmapScroll] Attempting to scroll. isMobileView:', isMobileView);
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (heatmapScrollRef.current) { // Re-verificar ref em caso de unmount
+            const currentContainer = heatmapScrollRef.current;
+            const targetScrollLeft = currentContainer.scrollWidth - currentContainer.clientWidth;
+            
+            console.log('[HeatmapScroll] Calculated values:', {
+              scrollWidth: currentContainer.scrollWidth,
+              clientWidth: currentContainer.clientWidth,
+              currentScrollLeft: currentContainer.scrollLeft,
+              targetScrollLeft: targetScrollLeft,
+            });
+
+            if (targetScrollLeft > 0) {
+              // Só rola se houver algo para rolar e se não já estiver na posição correta
+              // Adicionar uma pequena tolerância para evitar loops de rolagem se houver pequenas imprecisões de float
+              if (Math.abs(currentContainer.scrollLeft - targetScrollLeft) > 1) {
+                 currentContainer.scrollLeft = targetScrollLeft;
+                 console.log('[HeatmapScroll] Scrolled to:', currentContainer.scrollLeft);
+              } else {
+                console.log('[HeatmapScroll] Already at target scroll position or close enough.');
+              }
+            } else {
+              console.log('[HeatmapScroll] No scroll needed or not scrollable (scrollWidth <= clientWidth).');
+            }
+          } else {
+            console.log('[HeatmapScroll] Ref became null before scroll execution.');
+          }
+        }, 100); // Delay aumentado para 100ms para maior segurança no cálculo do layout.
+      });
+    }
+    // Opcional: Resetar scroll para a esquerda se não for mais mobile view e se houver scroll.
+    // else if (!isMobileView && heatmapScrollRef.current && heatmapScrollRef.current.scrollLeft > 0) {
+    //   heatmapScrollRef.current.scrollLeft = 0;
+    //   console.log('[HeatmapScroll] Reset scroll to left for desktop view.');
+    // }
+  }, [isMobileView, pomodoroSessions]); 
   
   // Calcula as datas do período selecionado
   const calculateDateRange = (): { startDate: Date; endDate: Date } => {
@@ -119,7 +186,7 @@ export default function Stats() {
     if (hours === 0) {
       return `${minutes} min`;
     } else {
-      return `${hours}h:${remainingMinutes}min`;
+      return `${hours}h${remainingMinutes > 0 ? `:${remainingMinutes.toString().padStart(2, '0')}` : ''}`;
     }
   };
   
@@ -153,37 +220,70 @@ export default function Stats() {
   
   // Obtém os dados de sessão por assunto, incluindo sessão Pomodoro ativa
   const getSessionsBySubject = (): Map<string, { time: number; color: string }> => {
-    const pomodoroState = usePomodoroStore.getState(); // Get fresh state
-    const allSessions = pomodoroState.sessions;
+    const { startDate, endDate } = calculateDateRange(); // Pega as datas do período selecionado em Stats
 
-    const { startDate, endDate } = calculateDateRange(); // Get period from Stats component state
-
-    // Filter sessions based on Stats period
-    const filteredSessions = allSessions.filter((session: PomodoroSession) => {
-      const sessionDate = parseISO(session.date);
-      return sessionDate >= startDate && sessionDate <= endDate;
+    // Filtra as sessões JÁ SALVAS que estão dentro do período selecionado
+    const filteredSavedSessions = pomodoroSessions.filter((session: PomodoroSession) => {
+      try {
+        const sessionDate = parseISO(session.date);
+        return sessionDate >= startDate && sessionDate <= endDate;
+      } catch (e) {
+        console.error("Error parsing session date in getSessionsBySubject:", session.date, e);
+        return false;
+      }
     });
 
     const subjectMap = new Map<string, { time: number; color: string }>();
 
-    // Initialize map with all subjects
+    // Inicializa o mapa com todas as matérias (tempo 0)
     subjects.forEach(subject => {
       subjectMap.set(subject.id, { time: 0, color: subject.color });
     });
 
-    // Sum ONLY the saved durations from filtered sessions
-    filteredSessions.forEach((session: PomodoroSession) => {
-      const subjectId = findSubjectIdForTopic(session.topicId); // findSubjectIdForTopic uses 'subjects' from Stats state, which is fine
+    // Soma a duração das sessões SALVAS para cada matéria
+    filteredSavedSessions.forEach((session: PomodoroSession) => {
+      const subjectId = findSubjectIdForTopic(session.topicId);
       if (subjectId) {
         const subjectData = subjectMap.get(subjectId);
         if (subjectData) {
           subjectMap.set(subjectId, { 
-            time: subjectData.time + session.duration, // Summing the saved duration
+            time: subjectData.time + session.duration, // Soma a duração salva
             color: subjectData.color 
           });
         }
       }
     });
+
+    // ADICIONA o tempo da sessão ATIVA, se houver e estiver no período
+    if (isRunning && currentTopicId) {
+      // Verifica se o dia atual está dentro do período selecionado
+      const today = new Date();
+      if (today >= startDate && today <= endDate) {
+        const subjectId = findSubjectIdForTopic(currentTopicId);
+        if (subjectId) {
+          const subjectData = subjectMap.get(subjectId);
+          const currentSessionMinutes = Math.floor(elapsedSeconds / 60);
+          
+          if (subjectData) {
+            // Adiciona os minutos da sessão ativa ao tempo já existente da matéria
+            subjectMap.set(subjectId, {
+              time: subjectData.time + currentSessionMinutes,
+              color: subjectData.color
+            });
+          } else {
+            // Se a matéria da sessão ativa não tinha sessões salvas no período,
+            // inicializa ela no mapa apenas com o tempo da sessão ativa.
+            const subject = subjects.find(s => s.id === subjectId);
+            if (subject) {
+              subjectMap.set(subjectId, {
+                time: currentSessionMinutes,
+                color: subject.color
+              });
+            }
+          }
+        }
+      }
+    }
 
     return subjectMap;
   };
@@ -391,6 +491,46 @@ export default function Stats() {
     return heatmapData;
   };
   
+  // Função para buscar atividades de uma data específica
+  const getActivitiesForDate = (date: Date): DailyActivity[] => {
+    const activities: DailyActivity[] = [];
+    
+    // Buscar Sessões Pomodoro
+    const daySessions = pomodoroSessions.filter(session => 
+      isSameDay(parseISO(session.date), date)
+    );
+    activities.push(...daySessions);
+    
+    // Buscar Revisões (concluídas ou agendadas para o dia)
+    const dayReviews = reviews.filter(review => {
+      const reviewDate = review.completed && review.date ? new Date(review.date) : new Date(review.scheduledDate);
+      return isSameDay(reviewDate, date);
+    });
+    activities.push(...dayReviews);
+    
+    // Ordenar por data/hora (opcional, mas útil)
+    activities.sort((a, b) => {
+        const dateA = (a as PomodoroSession).date || (a as Review).date || (a as Review).scheduledDate;
+        const dateB = (b as PomodoroSession).date || (b as Review).date || (b as Review).scheduledDate;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+
+    return activities;
+  };
+  
+  // Handler para clique na célula
+  const handleCellClick = (date: Date | null) => {
+    if (date) {
+      const activities = getActivitiesForDate(date);
+      setSelectedDateDetails(date);
+      setSelectedActivities(activities);
+    } else {
+      // Se clicar em célula vazia ou fora do range, limpa a seleção
+      setSelectedDateDetails(null);
+      setSelectedActivities([]);
+    }
+  };
+  
   // --- Renderização --- 
   const totalStudyTime = calculateTotalStudyTime();
   const weeklyStudyTime = calculateWeeklyStudyTime();
@@ -436,6 +576,21 @@ export default function Stats() {
     plugins: {
       legend: { position: 'bottom' as const },
       title: { display: true, text: 'Distribuição do tempo por disciplina' },
+      tooltip: {
+        callbacks: {
+          label: function(context: TooltipItem<"pie">) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed !== null) {
+              // Usa a função formatStudyTime para exibir "Xh:Ymin" ou "Z min"
+              label += formatStudyTime(context.parsed); 
+            }
+            return label;
+          }
+        }
+      }
     },
   };
   
@@ -566,17 +721,17 @@ export default function Stats() {
         </div>
       )}
       
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
         <div className="flex items-center">
           <h2 className="text-2xl font-bold dark:text-white">Estatísticas de Estudo</h2>
         </div>
         {/* Seletor de período */}
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto">
           {(['today', 'week', 'month', 'annual', 'custom'] as StatsPeriod[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+              className={`px-3 py-1 rounded-md text-sm transition-colors flex-shrink-0 ${
                 period === p
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'
@@ -591,7 +746,7 @@ export default function Stats() {
       {/* Inputs de Data Personalizada (aparem condicionalmente) */}
       {period === 'custom' && (
         <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg mb-6">
-          <div>
+          <div className="w-full sm:w-auto">
             <label htmlFor="customStartDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Data de Início:
             </label>
@@ -605,11 +760,11 @@ export default function Stats() {
                   setCustomStartDate(startOfDay(parseISO(dateValue)));
                 }
               }}
-              className="p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+              className="w-full p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
               max={format(customEndDate, 'yyyy-MM-dd')} 
             />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label htmlFor="customEndDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Data de Fim:
             </label>
@@ -623,34 +778,34 @@ export default function Stats() {
                   setCustomEndDate(endOfDay(parseISO(dateValue)));
                 }
               }}
-              className="p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+              className="w-full p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
               min={format(customStartDate, 'yyyy-MM-dd')} 
             />
           </div>
         </div>
       )}
       
-      {/* Principais cards de estatísticas */}
+      {/* Principais cards de estatísticas - melhorada responsividade */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
         <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
           <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300">Tempo Total</h3>
-          <p className="text-2xl font-bold mt-1 dark:text-white">{formatStudyTime(totalStudyTime)}</p>
+          <p className="text-xl sm:text-2xl font-bold mt-1 dark:text-white break-words">{formatStudyTime(totalStudyTime)}</p>
         </div>
         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
           <h3 className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Revisões Feitas</h3>
-          <p className="text-2xl font-bold mt-1 dark:text-white">{completedReviewsCount}</p>
+          <p className="text-xl sm:text-2xl font-bold mt-1 dark:text-white">{completedReviewsCount}</p>
         </div>
       </div>
       
       {/* Card de Dias Estudados separado */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center">
             <div>
               <h3 className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Dias Estudados</h3>
-              <p className="text-2xl font-bold mt-1 dark:text-white">{totalDatesStudied}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-1 dark:text-white">{totalDatesStudied}</p>
             </div>
-            <div className="text-indigo-700 dark:text-indigo-300">
+            <div className="text-indigo-700 dark:text-indigo-300 mt-2 sm:mt-0">
               <span className="block text-xs">Último estudo:</span>
               <span className="font-medium">
                 {(() => {
@@ -699,9 +854,9 @@ export default function Stats() {
                 style={{ width: `${weeklyProgress}%` }}
               ></div>
             </div>
-            <div className="flex justify-between items-center mt-2">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mt-2">
               <div>
-                <p className="text-2xl font-bold dark:text-white">
+                <p className="text-xl sm:text-2xl font-bold dark:text-white">
                   {isGoalCompleted ? (
                     <span className="flex items-center">
                       <span className="text-green-600 dark:text-green-400">Parabéns!</span>
@@ -715,7 +870,7 @@ export default function Stats() {
                   {isGoalCompleted ? "Meta semanal concluída!" : "Faltando esta semana"}
                 </span>
               </div>
-              <div className={`text-right ${isGoalCompleted ? 'text-green-700 dark:text-green-300' : 'text-teal-700 dark:text-teal-300'}`}>
+              <div className={`text-right mt-2 sm:mt-0 ${isGoalCompleted ? 'text-green-700 dark:text-green-300' : 'text-teal-700 dark:text-teal-300'}`}>
                 <span className="block text-xs">Até {formattedGoalEndDate}:</span>
                 <span className="font-medium">{formatStudyTime(weeklyGoal)}</span>
               </div>
@@ -724,10 +879,10 @@ export default function Stats() {
         </div>
       </div>
       
-      {/* Gráficos */}
+      {/* Gráficos - com melhor responsividade */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Gráfico de pizza */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-80">
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
           {pieChartData.labels.length > 0 ? (
             <Pie data={pieChartData} options={getChartOptions(pieOptions)} />
           ) : (
@@ -738,19 +893,19 @@ export default function Stats() {
         </div>
         
         {/* Gráfico de barras */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-80">
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
           <Bar data={barChartData} options={getChartOptions(barOptions)} />
         </div>
         
         {/* Gráfico de linha */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2 h-80">
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2 h-64 sm:h-80">
           <Line data={lineChartData} options={getChartOptions(lineOptions)} />
         </div>
         
-        {/* Heatmap de atividades */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2 flex flex-col items-center">
-          <h3 className="text-lg font-medium mb-4 text-center dark:text-white">Histórico de Atividades</h3>
-          <div className="overflow-x-auto" 
+        {/* Heatmap de atividades - Agora com melhor responsividade */}
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2">
+          <h3 className="text-lg font-medium mb-4 md:mb-6 text-center dark:text-white">Histórico de Atividades</h3>
+          <div ref={heatmapScrollRef} className="w-full overflow-x-auto" 
                aria-label="Histórico de atividades de estudo" 
                role="figure" 
                aria-description="Mapa de calor mostrando a frequência de sessões de estudo durante os últimos 12 meses">
@@ -889,7 +1044,7 @@ export default function Stats() {
               return (
                 <div className="github-style-heatmap centered-heatmap">
                   {/* Container para meses e grid */}
-                  <div className="heatmap-scroll-container">
+                  <div className="heatmap-content-wrapper">
                     {/* Rótulos dos meses */}
                     <div className="month-labels">
                       {monthLabelsData.map(({ label, columnIndex }) => (
@@ -950,24 +1105,25 @@ export default function Stats() {
                             
                             const minutes = dayData?.minutes || 0;
                             const isToday = dayData?.isToday || false;
-                            const tooltip = dayData?.tooltip || '';
+                            const tooltipText = dayData?.tooltip || '';
                             
                             return (
                               <div 
                                 key={`cell-${cellIndex}`}
-                                className={`day-cell ${isToday ? 'today' : ''}`}
+                                className={`day-cell ${isToday ? 'today' : ''} ${minutes > 0 ? 'has-activity' : ''}`}
                                 style={{
                                   backgroundColor: getColor(minutes),
                                   gridRow: dayOfWeek + 1,
                                   gridColumn: weekIndex + 1
                                 }}
-                                aria-label={tooltip}
-                                data-tooltip={tooltip}
+                                aria-label={tooltipText}
+                                data-tooltip={tooltipText}
+                                onClick={() => handleCellClick(minutes > 0 ? dayDate : null)}
                                 onMouseEnter={(e: React.MouseEvent) => {
-                                  const tooltipText = e.currentTarget.getAttribute('data-tooltip') || '';
+                                  const currentTooltipText = e.currentTarget.getAttribute('data-tooltip') || '';
                                   setTooltip({
                                     show: true,
-                                    text: tooltipText,
+                                    text: currentTooltipText,
                                     x: e.clientX,
                                     y: e.clientY
                                   });
@@ -1034,6 +1190,43 @@ export default function Stats() {
           </div>
         </div>
       </div>
+
+      {/* Área de Detalhes das Atividades */}
+      {selectedDateDetails && (
+        <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg lg:col-span-2 overflow-x-auto">
+          <h3 className="text-lg font-medium mb-3 dark:text-white">
+            Atividades de {format(selectedDateDetails, "dd 'de' MMMM, yyyy", { locale: pt })}
+          </h3>
+          {selectedActivities.length > 0 ? (
+            <ul className="space-y-2">
+              {selectedActivities.map((activity, index) => {
+                // Verifica se é PomodoroSession ou Review para mostrar detalhes diferentes
+                const isPomodoro = 'duration' in activity;
+                const topicId = (activity as PomodoroSession).topicId || (activity as Review).topicId;
+                const subjectId = findSubjectIdForTopic(topicId);
+                const subject = subjects.find(s => s.id === subjectId);
+                const topic = subject?.topics.find(t => t.id === topicId);
+
+                return (
+                  <li key={index} className="text-sm p-2 rounded bg-white dark:bg-gray-600 shadow-sm overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center">
+                      <span className={`font-semibold mr-2 ${isPomodoro ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                      {isPomodoro ? '[Foco]' : (activity as Review).completed ? '[Revisão Concluída]' : '[Revisão Agendada]'}
+                    </span>
+                      <span className="mt-1 sm:mt-0 dark:text-gray-300 break-words">
+                      {subject?.name || 'Matéria não encontrada'} - {topic?.title || 'Tópico não encontrado'}
+                      {isPomodoro && ` (${formatStudyTime((activity as PomodoroSession).duration)})`}
+                    </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400">Nenhuma atividade registrada neste dia.</p>
+          )}
+        </div>
+      )}
 
       {/* Tooltip global controlado por React */}
       {tooltip.show && (
@@ -1119,23 +1312,40 @@ export default function Stats() {
         
         .centered-heatmap {
           margin: 0 auto;
-          max-width: 900px;
+          width: 100%;
+          /* Removendo max-width fixo para melhor responsividade */
         }
 
-        .heatmap-scroll-container {
+        .heatmap-content-wrapper {
           position: relative;
-          width: 100%;
-          overflow-x: auto;
-          padding-bottom: 10px; /* Espaço para scroll bar */
-          padding-right: 5px; /* Espaço extra à direita para acomodar células escaladas */
-          ${isDarkMode ? 'scrollbar-color: #4b5563 #1f2937;' : ''}
+          padding-bottom: 10px;
+          padding-right: 5px;
+          min-width: min-content;
+        }
+
+        /* Mostra indicador de rolagem em dispositivos móveis */
+        @media (max-width: 768px) {
+          .heatmap-content-wrapper::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 50px;
+            background: linear-gradient(to right, transparent, ${isDarkMode ? 'rgba(31, 41, 55, 0.5)' : 'rgba(243, 244, 246, 0.5)'});
+            pointer-events: none;
+            opacity: 0.8;
+            border-radius: 0 4px 4px 0;
+          }
         }
 
         .month-labels {
           position: relative;
           height: 20px;
-          margin-left: 30px; /* Deixar espaço para labels de dia da semana */
+          margin-left: 30px;
           margin-bottom: 4px;
+          min-width: min-content;
         }
 
         .month-label {
@@ -1150,16 +1360,23 @@ export default function Stats() {
         .days-and-grid-container {
           display: flex;
           align-items: flex-start;
+          min-width: min-content;
         }
 
         .weekday-labels {
+          position: sticky;
+          left: 0;
+          z-index: 10; 
+          background-color: ${isDarkMode ? '#374151' : '#f9fafb'};
           display: flex;
           flex-direction: column;
+          min-width: 30px;
           width: 30px;
           gap: ${heatmapCellGap}px;
-          padding-top: 0; /* Remover padding para alinhar com grid */
-          justify-content: space-between; /* Distribuir igualmente */
-          height: calc(7 * ${heatmapCellSize}px + 6 * ${heatmapCellGap}px); /* Altura total do grid */
+          padding-top: 0;
+          justify-content: space-between;
+          height: calc(7 * ${heatmapCellSize}px + 6 * ${heatmapCellGap}px);
+          padding-right: 5px;
         }
 
         .weekday-label {
@@ -1167,6 +1384,7 @@ export default function Stats() {
           font-size: 9px;
           display: flex;
           align-items: center;
+          justify-content: center;
           color: ${isDarkMode ? '#a1a1aa' : '#6b7280'};
           white-space: nowrap;
           font-weight: ${isDarkMode ? '500' : 'normal'};
@@ -1178,8 +1396,9 @@ export default function Stats() {
 
         .days-grid {
           display: grid;
-          margin-left: 4px;
-          grid-auto-flow: column; /* Confirma o fluxo por coluna */
+          margin-left: 5px;
+          grid-auto-flow: column;
+          min-width: min-content;
         }
 
         .day-cell {
@@ -1240,6 +1459,23 @@ export default function Stats() {
         #global-tooltip {
           display: none; /* Escondemos o antigo */
         }
+
+        /* Ajusta o tamanho das células em telas pequenas */
+        @media (max-width: 480px) {
+          .color-scale-legend {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+          }
+          
+          .legend-item {
+            margin: 0 2px;
+          }
+          
+          .level-label {
+            font-size: 8px;
+          }
+        }
         
         .color-scale-legend {
           display: flex;
@@ -1249,8 +1485,10 @@ export default function Stats() {
           flex-wrap: wrap;
           margin-top: 10px;
           max-width: 100%;
-          padding: 0 20px;
-          ${isDarkMode ? 'background: rgba(31, 41, 55, 0.4); border-radius: 8px; padding: 8px 20px;' : ''}
+          padding: 0 10px;
+          ${isDarkMode ? 'background: rgba(31, 41, 55, 0.4); border-radius: 8px; padding: 8px 10px;' : ''}
+          overflow-x: auto; /* Permite rolagem horizontal se necessário */
+          -webkit-overflow-scrolling: touch;
         }
 
         .legend-text {
@@ -1281,39 +1519,47 @@ export default function Stats() {
           white-space: nowrap;
         }
 
-        .heatmap-scroll-container::-webkit-scrollbar {
+        .heatmap-content-wrapper::-webkit-scrollbar {
           height: 8px;
         }
         
-        .heatmap-scroll-container::-webkit-scrollbar-track {
+        .heatmap-content-wrapper::-webkit-scrollbar-track {
           background: ${isDarkMode ? '#1f2937' : '#f3f4f6'};
           border-radius: 4px;
         }
         
-        .heatmap-scroll-container::-webkit-scrollbar-thumb {
+        .heatmap-content-wrapper::-webkit-scrollbar-thumb {
           background-color: ${isDarkMode ? '#4b5563' : '#cbd5e1'};
           border-radius: 4px;
         }
         
-        .heatmap-scroll-container::-webkit-scrollbar-thumb:hover {
+        .heatmap-content-wrapper::-webkit-scrollbar-thumb:hover {
           background-color: ${isDarkMode ? '#6b7280' : '#94a3b8'};
         }
 
-        /* Remover as regras de overflow: visible !important adicionadas anteriormente */
-        /* .github-style-heatmap,
-        .heatmap-scroll-container,
-        .days-and-grid-container,
-        .days-grid {
-          overflow: visible !important;
-        } */
+        /* Adiciona um cursor pointer para células com atividade */
+        .day-cell.has-activity {
+          cursor: pointer;
+        }
+
+        .mobile-heatmap-rtl {
+          direction: rtl;
+        }
+
+        .mobile-heatmap-rtl > div {
+          direction: ltr; /* Garante que o conteúdo dos filhos não seja invertido */
+        }
         
-        /* Remover as regras de overflow: visible !important adicionadas anteriormente */
-        /* .bg-gray-50.dark\\:bg-gray-700.p-4.rounded-lg.lg\\:col-span-2.flex.flex-col.items-center {
-          overflow: visible !important;
-        } */
-        
-        @keyframes fadeIn {
-          // ... existing code ...
+        /* Especificidade para os rótulos de mês e dia dentro do RTL */
+        .mobile-heatmap-rtl .month-labels,
+        .mobile-heatmap-rtl .weekday-labels,
+        .mobile-heatmap-rtl .days-grid {
+          direction: ltr;
+        }
+
+        /* Se as células individuais do grid também precisarem de direção LTR explicitamente */
+        .mobile-heatmap-rtl .days-grid > div {
+            direction: ltr;
         }
       `}</style>
     </div>

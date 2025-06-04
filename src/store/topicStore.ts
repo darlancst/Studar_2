@@ -12,6 +12,7 @@ interface TopicState {
   deleteTopic: (id: string) => void;
   getTopicsBySubjectId: (subjectId: string) => Topic[];
   getTopicById: (id: string) => Topic | undefined;
+  resetTopics: () => void;
 }
 
 export const useTopicStore = create<TopicState>()(
@@ -66,6 +67,9 @@ export const useTopicStore = create<TopicState>()(
       },
       getTopicById: (id) => {
         return get().topics.find((topic) => topic.id === id);
+      },
+      resetTopics: () => {
+        set({ topics: [] });
       },
     }),
     {

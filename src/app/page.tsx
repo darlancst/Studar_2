@@ -25,11 +25,11 @@ export default function Home() {
         <div className="mt-6">
           {activeTab === 'calendar' && (
             <div>
-              <div className="flex justify-between mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
                 <h2 className="text-2xl font-bold">Calendário</h2>
                 <button
                   onClick={() => setShowSubjectManager(true)}
-                  className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 transition-colors"
+                  className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 transition-colors w-full sm:w-auto"
                 >
                   Gerenciar Matérias e Tópicos
                 </button>
