@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, StorageValue } from 'zustand/middleware';
+import { persist, createJSONStorage, StorageValue } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { PomodoroSession, PomodoroSettings, PomodoroState } from '@/types';
 import { useDatesStore } from './datesStore';
@@ -265,22 +265,7 @@ export const usePomodoroStore = create<PomodoroStore>()(
     }),
     {
       name: 'pomodoro-storage',
-      storage: {
-        getItem: (name: string): StorageValue<PomodoroStore> | null => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          const parsed = JSON.parse(str);
-          // Não faremos migração aqui, apenas retornamos o estado como está.
-          // A conversão Date -> string deve ser feita na lógica do store se necessário.
-          return parsed;
-        },
-        setItem: (name: string, value: StorageValue<PomodoroStore>): void => {
-          localStorage.setItem(name, JSON.stringify(value));
-        },
-        removeItem: (name: string): void => {
-          localStorage.removeItem(name);
-        },
-      },
+      storage: createJSONStorage(() => localStorage),
     }
   )
 ); 

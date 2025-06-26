@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 import { useSubjectStore } from '@/store/subjectStore';
 import { useTopicStore } from '@/store/topicStore';
@@ -19,9 +19,10 @@ interface DayDetailsProps {
   onClose: () => void;
   onCompleteReview: (id: string) => void;
   onTopicAdded: (topic: Topic) => void;
+  onDeleteTopic: (topicId: string) => void;
 }
 
-function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicAdded }: DayDetailsProps) {
+function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicAdded, onDeleteTopic }: DayDetailsProps) {
   const { subjects } = useSubjectStore();
   const { topics: allTopics, addTopic } = useTopicStore();
   const [showTopicForm, setShowTopicForm] = useState(false);
@@ -155,19 +156,28 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
                     return (
                       <div 
                         key={topic.id} 
-                        className="p-3 rounded-md dark:bg-opacity-20"
+                        className="p-3 rounded-md dark:bg-opacity-20 flex justify-between items-center"
                         style={{ backgroundColor: `${subject?.color}20` }}
                       >
-                        <div className="flex items-center">
-                          <div 
-                            className="w-3 h-3 rounded-full mr-2" 
-                            style={{ backgroundColor: subject?.color }}
-                          />
-                          <span className="font-medium dark:text-white">{topic.title}</span>
+                        <div>
+                          <div className="flex items-center">
+                            <div 
+                              className="w-3 h-3 rounded-full mr-2" 
+                              style={{ backgroundColor: subject?.color }}
+                            />
+                            <span className="font-medium dark:text-white">{topic.title}</span>
+                          </div>
+                          {topic.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{topic.description}</p>
+                          )}
                         </div>
-                        {topic.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{topic.description}</p>
-                        )}
+                        <button
+                          onClick={() => onDeleteTopic(topic.id)}
+                          className="ml-2 p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                          title="Excluir tópico"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
                       </div>
                     );
                   })}
@@ -248,7 +258,7 @@ export default function Calendar() {
   const [dayReviews, setDayReviews] = useState<Review[]>([]);
   
   const { subjects } = useSubjectStore();
-  const { topics } = useTopicStore();
+  const { topics, deleteTopic } = useTopicStore();
   const { reviews, toggleReviewCompletion } = useReviewStore();
   const { darkMode } = useSettingsStore();
   
@@ -335,6 +345,19 @@ export default function Calendar() {
   
   // Verifica se tem tarefas para o dia selecionado
   const hasTasks = dayTopics.length > 0 || dayReviews.length > 0;
+  
+  // NEW function to handle topic deletion
+  const handleDeleteTopic = (topicId: string) => {
+    // Optional: Add a confirmation dialog here
+    // if (!window.confirm("Tem certeza que deseja excluir este tópico e suas revisões associadas?")) {
+    //   return;
+    // }
+    deleteTopic(topicId); // Delete from store (this will also delete associated reviews)
+    setDayTopics(prevTopics => prevTopics.filter(t => t.id !== topicId)); // Update local state for summary
+    // If DayDetails modal is open and showing this topic, it will also need to reflect this.
+    // The modal receives dayTopics as a prop, so this update should propagate.
+    // However, the `topics` prop for DayDetails comes from `dayTopics`, which is now updated.
+  };
   
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col">
@@ -523,7 +546,9 @@ export default function Calendar() {
       <div className="border-t dark:border-gray-700 p-4">
         <div className="flex items-center mb-3">
           <h3 className="font-medium dark:text-white">
-            Tarefas para {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+            {isSameDay(selectedDate, new Date())
+              ? "Tarefas para hoje"
+              : `Tarefas para ${format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}`}
           </h3>
           <button
             onClick={() => setShowDayDetails(true)}
@@ -540,19 +565,37 @@ export default function Calendar() {
             {dayTopics.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Tópicos:</h4>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2">
                   {dayTopics.map(topic => {
                     const subject = subjects.find(s => s.id === topic.subjectId);
                     return (
                       <div 
                         key={topic.id} 
-                        className="inline-flex items-center py-1 px-2 rounded-md text-sm"
+                        className="flex items-center justify-between py-1 px-2 rounded-md text-sm"
                         style={{ 
                           backgroundColor: subject ? `${subject.color}20` : undefined,
-                          borderLeft: subject ? `3px solid ${subject.color}` : undefined
                         }}
                       >
-                        <span className="font-medium mr-1">{subject?.name}:</span> {topic.title}
+                        <div className="flex items-center">
+                          {subject && (
+                            <div 
+                              className="w-2 h-2 rounded-full mr-2" 
+                              style={{ backgroundColor: subject.color }}
+                            />
+                          )}
+                          <span className="font-medium mr-1">{subject?.name}:</span> 
+                          <span>{topic.title}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTopic(topic.id);
+                          }}
+                          className="ml-2 p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                          title="Excluir tópico"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     );
                   })}
@@ -615,6 +658,7 @@ export default function Calendar() {
           onClose={() => setShowDayDetails(false)}
           onCompleteReview={handleToggleReview}
           onTopicAdded={handleTopicAdded}
+          onDeleteTopic={handleDeleteTopic}
         />
       )}
 
