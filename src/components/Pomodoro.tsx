@@ -26,7 +26,6 @@ export default function Pomodoro() {
     skipToNext,
     updateSettings,
     incrementElapsedTime,
-    completeFocusSession,
     interruptFocusSession,
   } = usePomodoroStore();
   

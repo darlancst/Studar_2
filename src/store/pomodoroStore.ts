@@ -27,6 +27,7 @@ interface PomodoroStore {
   skipToNext: () => void;
   updateSettings: (settings: Partial<PomodoroSettings>) => void;
   incrementElapsedTime: (seconds: number) => void;
+  interruptFocusSession: (topicId: string, elapsedSeconds: number) => void;
   
   // Sessões Pomodoro
   addSession: (topicId: string, duration: number) => void;
@@ -188,6 +189,13 @@ export const usePomodoroStore = create<PomodoroStore>()(
         set({ elapsedSeconds: newElapsedSeconds });
       },
       
+      interruptFocusSession: (topicId, elapsedSeconds) => {
+        const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+        if (elapsedMinutes > 0) {
+          get().addSession(topicId, elapsedMinutes);
+        }
+      },
+
       addSession: (topicId, duration) => {
         if (duration <= 0) return; 
         
