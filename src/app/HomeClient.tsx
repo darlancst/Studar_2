@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import TabBar from '@/components/TabBar';
 import Calendar from '@/components/Calendar';
@@ -9,22 +9,11 @@ import Stats from '@/components/Stats';
 import SubjectTopicManager from '@/components/SubjectTopicManager';
 import SettingsModal from '@/components/SettingsModal';
 import { TabName } from '@/types';
-import { useSubjectStore } from '@/store/subjectStore';
-import { useTopicStore } from '@/store/topicStore';
 
 export default function HomeClient() {
   const [activeTab, setActiveTab] = useState<TabName>('calendar');
   const [showSubjectManager, setShowSubjectManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  
-  const { loadSubjects } = useSubjectStore();
-  const { loadTopics } = useTopicStore();
-
-  // Carregar dados do Supabase quando o componente montar
-  useEffect(() => {
-    loadSubjects();
-    loadTopics();
-  }, [loadSubjects, loadTopics]);
 
   return (
     <main className="flex min-h-screen flex-col">
