@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import TabBar from '@/components/TabBar';
 import Calendar from '@/components/Calendar';
@@ -9,11 +9,57 @@ import Stats from '@/components/Stats';
 import SubjectTopicManager from '@/components/SubjectTopicManager';
 import SettingsModal from '@/components/SettingsModal';
 import { TabName } from '@/types';
+import { useSubjectStore } from '@/store/subjectStore';
+
+import { useTopicStore } from '@/store/topicStore';
+
+import { useReviewStore } from '@/store/reviewStore';
+
+import { usePomodoroStore } from '@/store/pomodoroStore';
+
+import { useSessionStore } from '@/store/sessionStore';
+
+import { useSettingsStore } from '@/store/settingsStore';
+
+import { useDatesStore } from '@/store/datesStore';
 
 export default function HomeClient() {
   const [activeTab, setActiveTab] = useState<TabName>('calendar');
   const [showSubjectManager, setShowSubjectManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const fetchSubjects = useSubjectStore((state) => state.fetchSubjects);
+  const fetchTopics = useTopicStore((state) => state.fetchTopics);
+  const fetchReviews = useReviewStore((state) => state.fetchReviews);
+  const fetchPomodoroData = usePomodoroStore((state) => state.fetchPomodoroData);
+  const fetchSessions = useSessionStore((state) => state.fetchSessions);
+  const { settings, fetchSettings } = useSettingsStore((state) => ({ settings: state.settings, fetchSettings: state.fetchSettings }));
+  const fetchStudyDates = useDatesStore((state) => state.fetchStudyDates);
+
+  useEffect(() => {
+    fetchSubjects();
+    fetchTopics();
+    fetchReviews();
+    fetchPomodoroData();
+    fetchSessions();
+    fetchSettings();
+    fetchStudyDates();
+  }, [fetchSubjects, fetchTopics, fetchReviews, fetchPomodoroData, fetchSessions, fetchSettings, fetchStudyDates]);
+
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [settings.darkMode]);
+
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [settings.darkMode]);
 
   return (
     <main className="flex min-h-screen flex-col">
