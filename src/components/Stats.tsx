@@ -421,65 +421,59 @@ export default function Stats() {
     return weeklyTotal;
   };
   
-  // Prepara os dados para o heatmap (Refatorado com Logs)
+  // Prepara os dados para o heatmap
   const getHeatMapData = () => {
-    console.log("Calculando dados do Heatmap...");
-    // Se não tiver sessões, retorna vazio imediatamente
-    if (!pomodoroSessions || pomodoroSessions.length === 0) {
-      console.log("Heatmap: Sem sessões para processar.");
-      return [];
+    // 1. Cria uma lista unificada de todas as sessões, incluindo a ativa.
+    const allSessions: PomodoroSession[] = [...pomodoroSessions];
+
+    if (currentTopicId && elapsedSeconds > 0) {
+      const activeMinutes = Math.floor(elapsedSeconds / 60);
+      // Adiciona a sessão ativa como um objeto temporário para ser processado
+      // apenas se tiver durado pelo menos um minuto.
+      if (activeMinutes > 0) {
+        allSessions.push({
+          id: 'active-session',
+          topicId: currentTopicId,
+          duration: activeMinutes,
+          date: new Date().toISOString(),
+        });
+      }
     }
     
-    // Contar o TEMPO TOTAL (minutos) estudado em cada dia
+    // 2. Processa a lista unificada para criar o mapa de duração.
     const dateDurationMap = new Map<string, number>();
-    
-    // Soma a duração das sessões por dia
-    for (const session of pomodoroSessions) {
-      // Pula sessões sem data ou duração válida (precaução)
-      if (!session.date || session.duration == null) continue; 
-      
+    for (const session of allSessions) {
+      if (!session.date || session.duration == null) continue;
       try {
-      const dateStr = session.date.split('T')[0]; // Formato YYYY-MM-DD
+        const dateStr = session.date.split('T')[0]; // Formato YYYY-MM-DD
         const currentDuration = dateDurationMap.get(dateStr) || 0;
         dateDurationMap.set(dateStr, currentDuration + session.duration);
       } catch (error) {
         console.error("Erro ao processar data da sessão para heatmap:", session.date, error);
       }
     }
-    
-    console.log("Heatmap - Mapa de Duração por Data:", dateDurationMap);
-    
-    // Adiciona o tempo da sessão ativa ao dia de hoje
-    if (currentTopicId && elapsedSeconds > 0) {
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      const activeMinutes = Math.floor(elapsedSeconds / 60);
-      const todayDuration = dateDurationMap.get(todayStr) || 0;
-      dateDurationMap.set(todayStr, todayDuration + activeMinutes);
-    }
-    
-    // Converte para o formato esperado pelo heatmap, filtrando dias com 0 minutos
-    const heatmapData = Array.from(dateDurationMap.entries())
-      .filter(([date, totalMinutes]) => totalMinutes > 0) 
-      .map(([date, totalMinutes]) => {
-        let formattedDate = date; // Fallback
-        let formattedTime = `${totalMinutes} min`; // Fallback
-        try {
-      const parsedDate = parseISO(date);
-          formattedDate = format(parsedDate, "dd 'de' MMMM, yyyy", { locale: pt });
-          formattedTime = formatStudyTime(totalMinutes); 
-        } catch (error) {
-            console.error("Erro ao formatar data/hora do heatmap:", date, totalMinutes, error);
-        }
-      
-      return {
-          date, // Mantém YYYY-MM-DD para o componente HeatMap
-          count: totalMinutes, // Passa os minutos totais
-          content: `${formattedDate}: ${formattedTime} de estudo` 
-      };
-    });
 
-    console.log("Heatmap - Dados Finais:", heatmapData);
-    
+    // 3. Converte para o formato final do heatmap.
+    const heatmapData = Array.from(dateDurationMap.entries())
+      .filter(([date, totalMinutes]) => totalMinutes > 0)
+      .map(([date, totalMinutes]) => {
+        let formattedDate = date;
+        let formattedTime = `${totalMinutes} min`;
+        try {
+          const parsedDate = parseISO(date);
+          formattedDate = format(parsedDate, "dd 'de' MMMM, yyyy", { locale: pt });
+          formattedTime = formatStudyTime(totalMinutes);
+        } catch (error) {
+          console.error("Erro ao formatar data/hora do heatmap:", date, totalMinutes, error);
+        }
+
+        return {
+          date,
+          count: totalMinutes,
+          content: `${formattedDate}: ${formattedTime} de estudo`
+        };
+      });
+      
     return heatmapData;
   };
   
@@ -627,44 +621,40 @@ export default function Stats() {
 
   // Prepara os dados para os gráficos com cores adaptadas ao tema
   const getChartOptions = (options: any) => {
-    return {
-      ...options,
-      scales: options.scales 
-        ? {
-            ...options.scales,
-            y: options.scales.y 
-              ? {
-                  ...options.scales.y,
-                  ticks: { color: isDarkMode ? 'white' : undefined },
-                  grid: { color: isDarkMode ? '#444' : undefined },
-                  title: options.scales.y.title 
-                    ? {
-                        ...options.scales.y.title,
-                        color: isDarkMode ? 'white' : undefined
-                      }
-                    : undefined
-                }
-              : undefined,
-            x: {
-              ticks: { color: isDarkMode ? 'white' : undefined },
-              grid: { color: isDarkMode ? '#444' : undefined }
-            }
-          }
-        : undefined,
-      plugins: {
-        ...options.plugins,
-        legend: {
-          ...options.plugins.legend,
-          labels: {
-            color: isDarkMode ? 'white' : undefined
-          }
-        },
-        title: {
-          ...options.plugins.title,
-          color: isDarkMode ? 'white' : undefined
+    const newOptions = JSON.parse(JSON.stringify(options)); // Cópia profunda para evitar mutação
+
+    const color = isDarkMode ? 'white' : undefined;
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : undefined;
+
+    // Atualiza escalas de forma segura
+    if (newOptions.scales) {
+      if (newOptions.scales.y) {
+        newOptions.scales.y.ticks = { ...newOptions.scales.y.ticks, color };
+        newOptions.scales.y.grid = { ...newOptions.scales.y.grid, color: gridColor };
+        if (newOptions.scales.y.title) {
+          newOptions.scales.y.title.color = color;
         }
       }
-    };
+      if (newOptions.scales.x) {
+        newOptions.scales.x.ticks = { ...newOptions.scales.x.ticks, color };
+        newOptions.scales.x.grid = { ...newOptions.scales.x.grid, color: gridColor };
+        if (newOptions.scales.x.title) {
+          newOptions.scales.x.title.color = color;
+        }
+      }
+    }
+
+    // Atualiza plugins de forma segura
+    if (newOptions.plugins) {
+      if (newOptions.plugins.legend) {
+        newOptions.plugins.legend.labels = { ...newOptions.plugins.legend.labels, color };
+      }
+      if (newOptions.plugins.title) {
+        newOptions.plugins.title.color = color;
+      }
+    }
+
+    return newOptions;
   };
 
   // Função para resetar todas as estatísticas
