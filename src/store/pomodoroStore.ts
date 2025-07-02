@@ -25,11 +25,12 @@ interface PomodoroStore {
   fetchPomodoroData: () => Promise<void>;
   startTimer: (topicId: string) => void;
   pauseTimer: () => void;
-  resetTimer: () => void;
+  resetTimer: (saveProgress: boolean) => void;
   skipToNext: () => void;
   updateSettings: (settings: Partial<PomodoroSettings>) => Promise<void>;
   incrementElapsedTime: (seconds: number) => void;
   interruptFocusSession: (topicId: string, elapsedSeconds: number) => void;
+  _advanceState: () => void;
   
   // Sessões Pomodoro
   addSession: (topicId: string, duration: number) => Promise<void>;
@@ -83,7 +84,13 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     if (sessionsError) {
       console.error('Error fetching pomodoro sessions:', sessionsError);
     } else {
-      set({ sessions: sessions || [] });
+      const mappedSessions: PomodoroSession[] = (sessions || []).map(s => ({
+        id: s.id,
+        topicId: s.topic_id, // Mapeamento
+        duration: s.duration,
+        date: s.date,
+      }));
+      set({ sessions: mappedSessions });
     }
   },
   
@@ -108,17 +115,63 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     set({ isRunning: false });
   },
   
-  resetTimer: () => {
-    // This logic remains mostly client-side
+  resetTimer: (saveProgress = false) => {
+    const { currentState, currentTopicId, elapsedSeconds } = get();
+    if (saveProgress && currentState === 'focus' && currentTopicId && elapsedSeconds > 0) {
+      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+      if (elapsedMinutes > 0) {
+        get().addSession(currentTopicId, elapsedMinutes);
+      }
+    }
+    set({
+      isRunning: false,
+      currentState: 'idle',
+      currentTopicId: null,
+      timeRemaining: get().settings.focusDuration * 60,
+      elapsedSeconds: 0,
+    });
   },
   
   skipToNext: () => {
-    // This logic remains mostly client-side, but we save the completed session
-    const { currentState, settings, currentTopicId } = get();
+    const { currentState, currentTopicId, settings, elapsedSeconds } = get();
+
     if (currentState === 'focus' && currentTopicId) {
-      get().addSession(currentTopicId, settings.focusDuration);
+      // Salva o tempo decorrido ou a sessão completa
+      const durationToSave = elapsedSeconds > 0 ? Math.floor(elapsedSeconds / 60) : settings.focusDuration;
+      if (durationToSave > 0) {
+        get().addSession(currentTopicId, durationToSave);
+      }
     }
-    // ... rest of the client-side logic for switching states
+    get()._advanceState(); // Avança para o próximo estado (pausa, etc.)
+  },
+
+  _advanceState: () => {
+    const { currentState, completedPomodoros, settings } = get();
+    let nextState: PomodoroState;
+    let nextTimeRemaining: number;
+
+    if (currentState === 'focus') {
+      const newCompleted = completedPomodoros + 1;
+      set({ completedPomodoros: newCompleted });
+
+      if (newCompleted % settings.longBreakInterval === 0) {
+        nextState = 'longBreak';
+        nextTimeRemaining = settings.longBreakDuration * 60;
+      } else {
+        nextState = 'shortBreak';
+        nextTimeRemaining = settings.shortBreakDuration * 60;
+      }
+    } else { // Se estava em pausa curta ou longa
+      nextState = 'focus';
+      nextTimeRemaining = settings.focusDuration * 60;
+    }
+    
+    set({
+      currentState: nextState,
+      timeRemaining: nextTimeRemaining,
+      elapsedSeconds: 0,
+      isRunning: true, // Continua rodando no próximo estado
+    });
   },
   
   updateSettings: async (newSettings) => {
@@ -170,8 +223,8 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    const newSession: Omit<PomodoroSession, 'id'> & { user_id: string } = {
-      topicId,
+    const newSession = {
+      topic_id: topicId, // snake_case para o banco
       duration, 
       date: new Date().toISOString(),
       user_id: user.id,
@@ -183,11 +236,18 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       return;
     }
     
+    const mappedSession: PomodoroSession = {
+      id: data.id,
+      topicId: data.topic_id, // camelCase para o app
+      duration: data.duration,
+      date: data.date,
+    };
+
     set((state) => ({
-      sessions: [...state.sessions, data],
+      sessions: [...state.sessions, mappedSession],
     }));
     
-    useDatesStore.getState().addDate(new Date(data.date));
+    useDatesStore.getState().addDate(new Date(mappedSession.date));
   },
   
   getSessionsByTopicId: (topicId) => {
