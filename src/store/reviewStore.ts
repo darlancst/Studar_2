@@ -34,9 +34,9 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       return;
     }
 
-    const newReview: Omit<Review, 'id'> & { user_id: string } = {
-      topicId,
-      scheduledDate,
+    const newReview = {
+      topic_id: topicId,
+      scheduled_date: scheduledDate,
       completed: false,
       date: scheduledDate,
       user_id: user.id,
@@ -85,7 +85,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     }));
   },
   deleteReviewsByTopicId: async (topicId) => {
-    const { error } = await supabase.from('reviews').delete().eq('topicId', topicId);
+    const { error } = await supabase.from('reviews').delete().eq('topic_id', topicId);
     if (error) {
       console.error('Error deleting reviews by topicId:', error);
       return;
