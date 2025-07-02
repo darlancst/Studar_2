@@ -251,9 +251,9 @@ export default function Stats() {
       }
     });
 
-    // Adiciona o tempo da sessão ativa (se houver)
-    if (isRunning && currentTopicId && elapsedSeconds > 0) {
-      const sessionDate = new Date(); // A sessão atual é sempre "hoje"
+    // Adiciona o tempo da sessão ativa (pausada ou não)
+    if (currentTopicId && elapsedSeconds > 0) {
+      const sessionDate = new Date();
       if (sessionDate >= startDate && sessionDate <= endDate) {
         const subjectId = findSubjectIdForTopic(currentTopicId);
         if (subjectId) {
