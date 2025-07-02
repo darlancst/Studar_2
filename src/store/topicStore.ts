@@ -1,4 +1,4 @@
-"""import { create } from 'zustand';
+import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { Topic } from '@/types';
 import { useReviewStore } from './reviewStore';
@@ -60,7 +60,7 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     const today = customDate || new Date();
 
     // Usa os intervalos definidos pelo usuário (ou os padrão)
-    settingsStore.reviewIntervals.forEach(days => {
+    settingsStore.settings.reviewIntervals.forEach((days: number) => {
       const scheduledDate = new Date(today);
       scheduledDate.setDate(today.getDate() + days);
       reviewStore.addReview(data.id, scheduledDate);
@@ -103,4 +103,4 @@ export const useTopicStore = create<TopicState>((set, get) => ({
   resetTopics: () => {
     set({ topics: [] });
   },
-}));"" 
+})); 
