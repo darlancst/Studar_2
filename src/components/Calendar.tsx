@@ -262,7 +262,7 @@ export default function Calendar() {
   const { subjects } = useSubjectStore();
   const { topics, deleteTopic } = useTopicStore();
   const { reviews, toggleReviewCompletion } = useReviewStore();
-  const { darkMode } = useSettingsStore();
+  const darkMode = useSettingsStore((state) => state.settings.darkMode);
   
   // Dias do mês atual
   const monthStart = startOfMonth(currentMonth);
