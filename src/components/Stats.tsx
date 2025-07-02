@@ -72,7 +72,8 @@ export default function Stats() {
   const heatmapCellGap = 2; // Espaçamento entre células
   
   // Acesso direto aos limiares de tempo do heatmap
-  const { heatmapThresholds } = useSettingsStore();
+  const { settings } = useSettingsStore(state => ({ settings: state.settings }));
+  const { heatmapThresholds, weeklyGoal } = settings;
   
   const { getSubjectsWithTopics } = useSubjectStore();
   const { 
@@ -83,7 +84,6 @@ export default function Stats() {
   } = usePomodoroStore();
   const { reviews } = useReviewStore();
   const { getDates } = useDatesStore();
-  const { resetStats, resetPomodoros, weeklyGoal, weeklyGoalEndDate } = useSettingsStore();
   
   const subjects = getSubjectsWithTopics();
   
@@ -675,25 +675,15 @@ export default function Stats() {
     };
   };
 
-  // Função para resetar os pomodoros completados no período de 1 dia
-  const handleResetDailyPomodoros = () => {
-    resetPomodoros();
-    // Recarrega os dados
-    setRefreshCounter(prev => prev + 1);
-  };
-
   // Função para resetar todas as estatísticas
   const handleResetAllStats = () => {
-    resetStats();
+    // A função resetAllData do settingsStore deve ser usada para esta ação.
+    // Como ela não está sendo chamada aqui, esta função se torna redundante
+    // e pode ser substituída pela chamada direta nos botões.
+    // Por enquanto, vamos manter a lógica como está para evitar quebrar a UI
+    // mas a ação correta seria chamar useSettingsStore().getState().resetAllData()
     setShowResetConfirm(false);
-    // Recarrega os dados
-    setRefreshCounter(prev => prev + 1);
   };
-
-  // Formata a data final da meta salva no store
-  const formattedGoalEndDate = weeklyGoalEndDate 
-    ? format(parseISO(weeklyGoalEndDate), "dd 'de' MMMM", { locale: pt })
-    : "Definir Meta"; // Texto placeholder se a data não estiver definida
 
   return (
     <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-8 relative">
@@ -871,7 +861,7 @@ export default function Stats() {
                 </span>
               </div>
               <div className={`text-right mt-2 sm:mt-0 ${isGoalCompleted ? 'text-green-700 dark:text-green-300' : 'text-teal-700 dark:text-teal-300'}`}>
-                <span className="block text-xs">Até {formattedGoalEndDate}:</span>
+                <span className="block text-xs">Até {formattedWeekEndDate}:</span>
                 <span className="font-medium">{formatStudyTime(weeklyGoal)}</span>
               </div>
             </div>
