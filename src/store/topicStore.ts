@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client';
 
 const supabase = createClient();
 
+export type { Topic };
+
 interface TopicState {
   topics: Topic[];
   fetchTopics: () => Promise<void>;

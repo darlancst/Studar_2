@@ -105,13 +105,6 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
   
   pauseTimer: () => {
-    if (get().currentState === 'focus' && get().currentTopicId && get().elapsedSeconds > 0) {
-      const elapsedMinutes = Math.floor(get().elapsedSeconds / 60);
-      if (elapsedMinutes > 0) {
-        get().addSession(get().currentTopicId!, elapsedMinutes);
-      }
-      set({ elapsedSeconds: 0 }); 
-    }
     set({ isRunning: false });
   },
   
