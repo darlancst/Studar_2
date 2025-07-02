@@ -253,11 +253,18 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
 }
 
 export default function Calendar() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayDetails, setShowDayDetails] = useState(false);
   const [dayTopics, setDayTopics] = useState<Topic[]>([]);
   const [dayReviews, setDayReviews] = useState<Review[]>([]);
+  
+  // Define a data inicial apenas no lado do cliente para evitar erro de hidratação
+  useEffect(() => {
+    const today = new Date();
+    setCurrentMonth(today);
+    setSelectedDate(today);
+  }, []);
   
   const { subjects } = useSubjectStore();
   const { topics, deleteTopic } = useTopicStore();
@@ -360,6 +367,35 @@ export default function Calendar() {
     // The modal receives dayTopics as a prop, so this update should propagate.
     // However, the `topics` prop for DayDetails comes from `dayTopics`, which is now updated.
   };
+  
+  // Exibe um esqueleto de carregamento até que as datas estejam prontas no cliente
+  if (!currentMonth || !selectedDate) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col p-4 animate-pulse">
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="flex space-x-2">
+            <div className="h-8 w-16 bg-gray-300 dark:bg-gray-700 rounded-md"></div>
+            <div className="h-8 w-8 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-900">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="p-2 h-8">
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mx-auto"></div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 flex-grow">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <div key={i} className="h-20 border-t border-r dark:border-gray-700 p-1">
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col">
