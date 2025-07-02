@@ -20,12 +20,19 @@ interface ReviewState {
 export const useReviewStore = create<ReviewState>((set, get) => ({
   reviews: [],
   fetchReviews: async () => {
-    const { data: reviews, error } = await supabase.from('reviews').select('*');
+    const { data, error } = await supabase.from('reviews').select('*');
     if (error) {
       console.error('Error fetching reviews:', error);
       return;
     }
-    set({ reviews: reviews || [] });
+    const mappedReviews: Review[] = (data || []).map(review => ({
+      id: review.id,
+      topicId: review.topic_id,
+      scheduledDate: new Date(review.scheduled_date),
+      completed: review.completed,
+      date: new Date(review.date),
+    }));
+    set({ reviews: mappedReviews });
   },
   addReview: async (topicId, scheduledDate) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -48,8 +55,16 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       return;
     }
 
+    const newReviewMapped: Review = {
+      id: data.id,
+      topicId: data.topic_id,
+      scheduledDate: new Date(data.scheduled_date),
+      completed: data.completed,
+      date: new Date(data.date),
+    };
+
     set((state) => ({
-      reviews: [...state.reviews, data],
+      reviews: [...state.reviews, newReviewMapped],
     }));
   },
   toggleReviewCompletion: async (id) => {

@@ -327,13 +327,18 @@ function CalendarView({ initialDate }: { initialDate: Date }) {
   };
   
   const handleTopicAdded = (topic: Topic) => {
-    setDayTopics(prev => [...prev, topic]);
+    // A atualização agora é reativa e virá do 'useEffect' que escuta as mudanças no 'topics' do store.
+    // A linha abaixo foi removida para evitar o efeito de "piscar".
+    // setDayTopics(prev => [...prev, topic]);
   };
   
   const handleDeleteTopic = (topicId: string) => {
     deleteTopic(topicId);
     setDayTopics(prevTopics => prevTopics.filter(t => t.id !== topicId));
   };
+  
+  // Verifica se tem tarefas para o dia selecionado
+  const hasTasks = dayTopics.length > 0 || dayReviews.length > 0;
   
   // O JSX do calendário original vem para cá.
   return (
@@ -536,7 +541,7 @@ function CalendarView({ initialDate }: { initialDate: Date }) {
           </button>
         </div>
         
-        {dayTopics.length > 0 || dayReviews.length > 0 ? (
+        {hasTasks ? (
           <div className="space-y-3">
             {/* Tópicos do dia */}
             {dayTopics.length > 0 && (

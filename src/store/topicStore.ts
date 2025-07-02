@@ -21,12 +21,20 @@ interface TopicState {
 export const useTopicStore = create<TopicState>((set, get) => ({
   topics: [],
   fetchTopics: async () => {
-    const { data: topics, error } = await supabase.from('topics').select('*');
+    const { data, error } = await supabase.from('topics').select('*');
     if (error) {
       console.error('Error fetching topics:', error);
       return;
     }
-    set({ topics: topics || [] });
+    // Mapeia de snake_case (banco) para camelCase (app)
+    const mappedTopics: Topic[] = (data || []).map(topic => ({
+      id: topic.id,
+      title: topic.title,
+      description: topic.description,
+      subjectId: topic.subject_id,
+      createdAt: new Date(topic.created_at),
+    }));
+    set({ topics: mappedTopics });
   },
   addTopic: async (title, subjectId, description, customDate) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -49,8 +57,17 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       return;
     }
 
+    // Mapeia o resultado do banco para o tipo camelCase do app antes de salvar no estado
+    const newTopicMapped: Topic = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      subjectId: data.subject_id,
+      createdAt: new Date(data.created_at),
+    };
+
     set((state) => ({
-      topics: [...state.topics, data],
+      topics: [...state.topics, newTopicMapped],
     }));
 
     // Cria revisões usando os intervalos personalizados do usuário
@@ -66,10 +83,17 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       reviewStore.addReview(data.id, scheduledDate);
     });
 
-    return data;
+    return newTopicMapped;
   },
   updateTopic: async (id, data) => {
-    const { error } = await supabase.from('topics').update(data).eq('id', id);
+    // Para update, precisamos mapear os dados do app (camelCase) para o banco (snake_case)
+    const dataToUpdate: any = {};
+    if (data.subjectId) dataToUpdate.subject_id = data.subjectId;
+    if (data.createdAt) dataToUpdate.created_at = data.createdAt;
+    if (data.title) dataToUpdate.title = data.title;
+    if (data.description) dataToUpdate.description = data.description;
+
+    const { error } = await supabase.from('topics').update(dataToUpdate).eq('id', id);
     if (error) {
       console.error('Error updating topic:', error);
       return;
