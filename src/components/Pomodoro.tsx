@@ -148,7 +148,7 @@ export default function Pomodoro() {
 
       <div className="session-info">
         <p>Pomodoros Concluídos: {completedPomodoros}</p>
-        {currentState === 'focus' && displaySessionMinutes > 0 && (
+        {displaySessionMinutes > 0 && (
           <p>Minutos de Foco na Sessão: {displaySessionMinutes}</p>
         )}
       </div>

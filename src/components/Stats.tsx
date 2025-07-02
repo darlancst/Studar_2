@@ -220,66 +220,50 @@ export default function Stats() {
   
   // Obtém os dados de sessão por assunto, incluindo sessão Pomodoro ativa
   const getSessionsBySubject = (): Map<string, { time: number; color: string }> => {
-    const { startDate, endDate } = calculateDateRange(); // Pega as datas do período selecionado em Stats
+    const { startDate, endDate } = calculateDateRange();
 
-    // Filtra as sessões JÁ SALVAS que estão dentro do período selecionado
     const filteredSavedSessions = pomodoroSessions.filter((session: PomodoroSession) => {
       try {
         const sessionDate = parseISO(session.date);
         return sessionDate >= startDate && sessionDate <= endDate;
       } catch (e) {
-        console.error("Error parsing session date in getSessionsBySubject:", session.date, e);
+        console.error("Error parsing session date:", e);
         return false;
       }
     });
 
     const subjectMap = new Map<string, { time: number; color: string }>();
 
-    // Inicializa o mapa com todas as matérias (tempo 0)
     subjects.forEach(subject => {
       subjectMap.set(subject.id, { time: 0, color: subject.color });
     });
 
-    // Soma a duração das sessões SALVAS para cada matéria
     filteredSavedSessions.forEach((session: PomodoroSession) => {
       const subjectId = findSubjectIdForTopic(session.topicId);
       if (subjectId) {
         const subjectData = subjectMap.get(subjectId);
         if (subjectData) {
           subjectMap.set(subjectId, { 
-            time: subjectData.time + session.duration, // Soma a duração salva
+            time: subjectData.time + session.duration,
             color: subjectData.color 
           });
         }
       }
     });
 
-    // ADICIONA o tempo da sessão ATIVA, se houver e estiver no período
-    if (isRunning && currentTopicId) {
-      // Verifica se o dia atual está dentro do período selecionado
-      const today = new Date();
-      if (today >= startDate && today <= endDate) {
+    // Adiciona o tempo da sessão ativa (se houver)
+    if (isRunning && currentTopicId && elapsedSeconds > 0) {
+      const sessionDate = new Date(); // A sessão atual é sempre "hoje"
+      if (sessionDate >= startDate && sessionDate <= endDate) {
         const subjectId = findSubjectIdForTopic(currentTopicId);
         if (subjectId) {
           const subjectData = subjectMap.get(subjectId);
-          const currentSessionMinutes = Math.floor(elapsedSeconds / 60);
-          
           if (subjectData) {
-            // Adiciona os minutos da sessão ativa ao tempo já existente da matéria
+            const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
             subjectMap.set(subjectId, {
-              time: subjectData.time + currentSessionMinutes,
-              color: subjectData.color
+              time: subjectData.time + activeSessionMinutes,
+              color: subjectData.color,
             });
-          } else {
-            // Se a matéria da sessão ativa não tinha sessões salvas no período,
-            // inicializa ela no mapa apenas com o tempo da sessão ativa.
-            const subject = subjects.find(s => s.id === subjectId);
-            if (subject) {
-              subjectMap.set(subjectId, {
-                time: currentSessionMinutes,
-                color: subject.color
-              });
-            }
           }
         }
       }
