@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { usePomodoroStore } from '../store/pomodoroStore';
 import { useTopicStore, type Topic } from '../store/topicStore';
 import { useSubjectStore } from '../store/subjectStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { FaForward, FaRedo } from 'react-icons/fa';
 import { isSameDay } from 'date-fns';
 
@@ -19,13 +20,14 @@ export default function Pomodoro() {
   
   const subjects = useSubjectStore(state => state.subjects);
   
+  const { settings } = useSettingsStore();
+
   const {
     currentTopicId,
     currentState,
     timeRemaining,
     isRunning,
     completedPomodoros,
-    settings,
     elapsedSeconds,
   } = usePomodoroStore();
 
@@ -82,7 +84,7 @@ export default function Pomodoro() {
       currentTopicId: newTopicId,
       currentState: 'idle',
       isRunning: false,
-      timeRemaining: settings.focusDuration * 60,
+      timeRemaining: settings.pomodoro.focusDuration * 60,
       elapsedSeconds: 0,
     });
   };
