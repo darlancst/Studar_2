@@ -62,16 +62,16 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     if (!user) return;
 
     // Fetch settings
-    const { data: settings, error: settingsError } = await supabase
+    const { data: userSettings, error: settingsError } = await supabase
       .from('user_settings')
-      .select('pomodoro_settings')
+      .select('settings') // Seleciona o objeto de configurações inteiro
       .eq('user_id', user.id)
       .single();
 
-    if (settingsError || !settings) {
+    if (settingsError || !userSettings) {
       console.error('Error fetching settings or no settings found', settingsError);
-    } else {
-      set({ settings: { ...DEFAULT_SETTINGS, ...settings.pomodoro_settings } });
+    } else if (userSettings.settings && userSettings.settings.pomodoro) { // Verifica se pomodoro settings existem
+      set({ settings: { ...DEFAULT_SETTINGS, ...userSettings.settings.pomodoro } });
     }
 
     // Fetch sessions
@@ -125,12 +125,27 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const updatedSettings = { ...get().settings, ...newSettings };
-    set({ settings: updatedSettings });
+    const currentSettings = get().settings;
+    const updatedPomodoroSettings = { ...currentSettings, ...newSettings };
+    set({ settings: updatedPomodoroSettings });
+
+    // Pega as configurações gerais existentes para não sobrescrevê-las
+    const { data: existingSettingsData } = await supabase
+      .from('user_settings')
+      .select('settings')
+      .eq('user_id', user.id)
+      .single();
+
+    const existingSettings = existingSettingsData?.settings || {};
+
+    const updatedGeneralSettings = {
+      ...existingSettings,
+      pomodoro: updatedPomodoroSettings, // Aninha as configs do pomodoro
+    };
 
     const { error } = await supabase
       .from('user_settings')
-      .upsert({ user_id: user.id, pomodoro_settings: updatedSettings });
+      .upsert({ user_id: user.id, settings: updatedGeneralSettings });
 
     if (error) {
       console.error('Error updating settings:', error);
