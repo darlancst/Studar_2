@@ -25,19 +25,22 @@ interface SettingsModalProps {
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetAction, setResetAction] = useState<'stats' | 'all'>('all');
+  
   const { 
-    darkMode, 
+    settings,
     toggleDarkMode, 
-    resetStats, 
-    resetPomodoros, 
     resetAllData, 
-    weeklyGoal, 
     setWeeklyGoal,
-    reviewIntervals,
     setReviewIntervals,
-    heatmapThresholds,
-    setHeatmapThresholds
-  } = useSettingsStore();
+  } = useSettingsStore(state => ({
+    settings: state.settings,
+    toggleDarkMode: state.toggleDarkMode,
+    resetAllData: state.resetAllData,
+    setWeeklyGoal: state.setWeeklyGoal,
+    setReviewIntervals: state.setReviewIntervals,
+  }));
+
+  const { darkMode, weeklyGoal, reviewIntervals, heatmapThresholds } = settings;
   
   // Estado para gerenciar o valor da meta semanal no formulário
   const [goalHours, setGoalHours] = useState(Math.floor(weeklyGoal / 60));
@@ -107,7 +110,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     orderedThresholds.level5 = values[4];
     
     setThresholds(orderedThresholds);
-    setHeatmapThresholds(orderedThresholds);
   };
   
   // Função para resetar os limiares para os valores padrão
@@ -120,18 +122,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       level5: 240
     };
     setThresholds(defaultThresholds);
-    setHeatmapThresholds(defaultThresholds);
-  };
-
-  // Função para resetar todas as estatísticas
-  const handleResetStats = () => {
-    resetStats();
-    setShowResetConfirm(false);
-  };
-
-  // Função para resetar os pomodoros
-  const handleResetPomodoros = () => {
-    resetPomodoros();
   };
 
   // Função para resetar todos os dados
@@ -146,11 +136,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleConfirmReset = () => {
-    if (resetAction === 'stats') {
-      handleResetStats();
-    } else {
-      handleResetAllData();
-    }
+    resetAllData();
+    setShowResetConfirm(false);
   };
 
   return (
@@ -456,7 +443,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   <span className="text-gray-700 dark:text-gray-300">Pomodoros</span>
                 </div>
                 <button
-                  onClick={handleResetPomodoros}
+                  onClick={handleResetAllData}
                   className="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 text-sm flex items-center"
                 >
                   <ArrowPathIcon className="h-4 w-4 mr-1" />
