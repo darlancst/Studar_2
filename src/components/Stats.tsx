@@ -449,6 +449,14 @@ export default function Stats() {
     
     console.log("Heatmap - Mapa de Duração por Data:", dateDurationMap);
     
+    // Adiciona o tempo da sessão ativa ao dia de hoje
+    if (currentTopicId && elapsedSeconds > 0) {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const activeMinutes = Math.floor(elapsedSeconds / 60);
+      const todayDuration = dateDurationMap.get(todayStr) || 0;
+      dateDurationMap.set(todayStr, todayDuration + activeMinutes);
+    }
+    
     // Converte para o formato esperado pelo heatmap, filtrando dias com 0 minutos
     const heatmapData = Array.from(dateDurationMap.entries())
       .filter(([date, totalMinutes]) => totalMinutes > 0) 
@@ -885,36 +893,7 @@ export default function Stats() {
                aria-description="Mapa de calor mostrando a frequência de sessões de estudo durante os últimos 12 meses">
             {(() => {
               // 1. Obter os dados para o heatmap de forma simplificada
-              const heatmapData = (() => {
-                // Se não tiver sessões, retorna vazio
-                if (!pomodoroSessions || pomodoroSessions.length === 0) {
-                  return [];
-                }
-                
-                // Contar o tempo estudado em cada dia
-                const dateDurationMap = new Map<string, number>();
-                
-                pomodoroSessions.forEach(session => {
-                  if (!session.date || session.duration == null) return;
-                  
-                  try {
-                    const dateStr = session.date.split('T')[0]; // YYYY-MM-DD
-                    const currentDuration = dateDurationMap.get(dateStr) || 0;
-                    dateDurationMap.set(dateStr, currentDuration + session.duration);
-                  } catch (error) {
-                    console.error("Erro ao processar data:", error);
-                  }
-                });
-                
-                // Converter para o formato do heatmap
-                return Array.from(dateDurationMap.entries())
-                  .filter(([_, minutes]) => minutes > 0)
-                  .map(([date, minutes]) => ({
-                    date,
-                    count: minutes,
-                    content: `${date}: ${formatStudyTime(minutes)}`
-                  }));
-              })();
+              const heatmapData = getHeatMapData();
               
               // 2. Funções auxiliares para o heatmap
               const getColor = (count: number) => {
