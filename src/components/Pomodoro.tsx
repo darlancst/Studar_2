@@ -138,10 +138,10 @@ export default function Pomodoro() {
             
             // Antes de mudar, INTERROMPE a sessão do TÓPICO ANTERIOR (se estava em foco)
             if (state.currentState === 'focus' && previousTopicId && state.elapsedSeconds > 0) {
-               // Chama a ação centralizada para atualizar a sessão anterior
+               // Salva o tempo decorrido para o tópico anterior
                interruptFocusSession(previousTopicId, state.elapsedSeconds);
-              // Resetar elapsedSeconds ao trocar de tópico durante foco
-              usePomodoroStore.setState({ elapsedSeconds: 0, lastMinuteUpdate: 0 });
+               // Resetar elapsedSeconds ao trocar de tópico durante foco
+               usePomodoroStore.setState({ elapsedSeconds: 0 });
             }
             
             // Atualiza o tópico atual no estado
