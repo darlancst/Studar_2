@@ -35,12 +35,12 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       return;
     }
 
-    const newTopic: Omit<Topic, 'id' | 'createdAt'> & { user_id: string } = {
+    const newTopic = {
       title,
-      subjectId,
+      subject_id: subjectId,
       description,
       user_id: user.id,
-      ...(customDate && { createdAt: customDate.toISOString() }),
+      ...(customDate && { created_at: customDate.toISOString() }),
     };
 
     const { data, error } = await supabase.from('topics').insert(newTopic).select().single();
