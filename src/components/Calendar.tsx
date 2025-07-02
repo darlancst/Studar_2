@@ -38,7 +38,7 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
   }, [subjects, selectedSubjectId]);
 
   // Função para lidar com a criação de um novo tópico
-  const handleCreateTopic = (e: React.FormEvent) => {
+  const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTopicTitle.trim() && selectedSubjectId) {
       // Cria o tópico usando a data selecionada no calendário (início do dia)
@@ -46,14 +46,16 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
       const newTopicDate = startOfDay(new Date(date));
       
       // Passa a data personalizada para o addTopic
-      const newTopic = addTopic(
+      const newTopic = await addTopic(
         newTopicTitle.trim(), 
         selectedSubjectId, 
         newTopicDescription.trim(),
         newTopicDate
       );
       
-      onTopicAdded(newTopic);
+      if (newTopic) {
+        onTopicAdded(newTopic);
+      }
       
       // Limpa o formulário e volta para a visualização
       setNewTopicTitle('');
