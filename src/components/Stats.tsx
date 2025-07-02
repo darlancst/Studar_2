@@ -428,14 +428,12 @@ export default function Stats() {
 
     if (currentTopicId && elapsedSeconds > 0) {
       const activeMinutes = Math.floor(elapsedSeconds / 60);
-      // Adiciona a sessão ativa como um objeto temporário para ser processado
-      // apenas se tiver durado pelo menos um minuto.
       if (activeMinutes > 0) {
         allSessions.push({
           id: 'active-session',
           topicId: currentTopicId,
           duration: activeMinutes,
-          date: new Date().toISOString(),
+          date: new Date().toISOString(), // Usar ISO string para consistência
         });
       }
     }
@@ -445,7 +443,8 @@ export default function Stats() {
     for (const session of allSessions) {
       if (!session.date || session.duration == null) continue;
       try {
-        const dateStr = session.date.split('T')[0]; // Formato YYYY-MM-DD
+        // Usa a data do ISO string diretamente como chave (YYYY-MM-DD)
+        const dateStr = session.date.split('T')[0];
         const currentDuration = dateDurationMap.get(dateStr) || 0;
         dateDurationMap.set(dateStr, currentDuration + session.duration);
       } catch (error) {

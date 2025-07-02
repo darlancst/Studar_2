@@ -1,10 +1,7 @@
 import { create } from 'zustand';
 import { createClient } from '@/lib/supabase/client';
 import { useSubjectStore } from './subjectStore';
-import { useTopicStore } from './topicStore';
 import { useReviewStore } from './reviewStore';
-import { usePomodoroStore } from './pomodoroStore';
-import { useSessionStore } from './sessionStore';
 
 const supabase = createClient();
 
@@ -20,11 +17,19 @@ const DEFAULT_HEATMAP_THRESHOLDS: HeatmapThresholds = {
   level1: 30, level2: 60, level3: 120, level4: 180, level5: 240,
 };
 
+const DEFAULT_POMODORO_SETTINGS = {
+  focusDuration: 25,
+  shortBreakDuration: 5,
+  longBreakDuration: 15,
+  longBreakInterval: 4,
+};
+
 const DEFAULT_SETTINGS = {
   darkMode: false,
   weeklyGoal: 600,
   reviewIntervals: [1, 7, 30],
   heatmapThresholds: DEFAULT_HEATMAP_THRESHOLDS,
+  pomodoro: DEFAULT_POMODORO_SETTINGS,
 };
 
 interface SettingsState {
@@ -39,6 +44,7 @@ interface SettingsState {
   toggleDarkMode: () => void;
   setWeeklyGoal: (minutes: number) => void;
   setReviewIntervals: (intervals: number[]) => void;
+  setPomodoroSettings: (pomodoroSettings: Partial<typeof DEFAULT_POMODORO_SETTINGS>) => void;
   
   // Destructive actions
   resetAllData: () => Promise<void>;
@@ -100,6 +106,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     get().updateSettings({ reviewIntervals: sortedIntervals });
   },
 
+  setPomodoroSettings: (pomodoroSettings) => {
+    const currentPomodoroSettings = get().settings.pomodoro;
+    get().updateSettings({ 
+      pomodoro: { ...currentPomodoroSettings, ...pomodoroSettings } 
+    });
+  },
+
   resetAllData: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -123,12 +136,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     // Reset local state in all stores
     useSubjectStore.getState().resetSubjects();
-    useTopicStore.getState().resetTopics();
     useReviewStore.getState().resetReviews();
-    // usePomodoroStore has no simple reset, reset manually
-    usePomodoroStore.setState({ sessions: [], completedPomodoros: 0 });
-    // useSessionStore has no reset, reset manually
-    useSessionStore.setState({ sessions: [] });
 
     // Reset settings to default in DB and local state
     await get().updateSettings(DEFAULT_SETTINGS);

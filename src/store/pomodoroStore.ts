@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { PomodoroSession, PomodoroSettings, PomodoroState } from '@/types';
+import { PomodoroSession, PomodoroState } from '@/types';
 import { useDatesStore } from './datesStore';
 import { createClient } from '@/lib/supabase/client';
+import { useSettingsStore } from './settingsStore';
 
 const supabase = createClient();
 
@@ -18,16 +19,12 @@ interface PomodoroStore {
   // Sessões (do Pomodoro, não do estudo geral)
   sessions: PomodoroSession[];
   
-  // Configurações
-  settings: PomodoroSettings;
-  
   // Ações
   fetchPomodoroData: () => Promise<void>;
   startTimer: (topicId: string) => void;
   pauseTimer: () => void;
   resetTimer: (saveProgress: boolean) => void;
   skipToNext: () => void;
-  updateSettings: (settings: Partial<PomodoroSettings>) => Promise<void>;
   incrementElapsedTime: (seconds: number) => void;
   interruptFocusSession: (topicId: string, elapsedSeconds: number) => void;
   _advanceState: () => void;
@@ -39,41 +36,20 @@ interface PomodoroStore {
   getCurrentSessionTime: () => number; // Retorna o tempo da sessão atual em minutos
 }
 
-const DEFAULT_SETTINGS: PomodoroSettings = {
-  focusDuration: 25, // 25 minutos
-  shortBreakDuration: 5, // 5 minutos
-  longBreakDuration: 15, // 15 minutos
-  longBreakInterval: 4, // A cada 4 pomodoros
-};
-
 export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   // Estado inicial
   currentState: 'idle',
   isRunning: false,
   currentTopicId: null,
-  timeRemaining: DEFAULT_SETTINGS.focusDuration * 60, // em segundos
+  timeRemaining: useSettingsStore.getState().settings.pomodoro.focusDuration * 60,
   completedPomodoros: 0,
   elapsedSeconds: 0,
   
   sessions: [],
-  settings: DEFAULT_SETTINGS,
 
   fetchPomodoroData: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    // Fetch settings
-    const { data: userSettings, error: settingsError } = await supabase
-      .from('user_settings')
-      .select('settings') // Seleciona o objeto de configurações inteiro
-      .eq('user_id', user.id)
-      .single();
-
-    if (settingsError || !userSettings) {
-      console.error('Error fetching settings or no settings found', settingsError);
-    } else if (userSettings.settings && userSettings.settings.pomodoro) { // Verifica se pomodoro settings existem
-      set({ settings: { ...DEFAULT_SETTINGS, ...userSettings.settings.pomodoro } });
-    }
 
     // Fetch sessions
     const { data: sessions, error: sessionsError } = await supabase
@@ -95,11 +71,12 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
   
   startTimer: (topicId) => {
+    const { settings } = useSettingsStore.getState();
     set({
       isRunning: true,
       currentTopicId: topicId,
       currentState: 'focus',
-      timeRemaining: get().settings.focusDuration * 60,
+      timeRemaining: settings.pomodoro.focusDuration * 60,
       elapsedSeconds: 0,
     });
   },
@@ -116,21 +93,23 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
         get().addSession(currentTopicId, elapsedMinutes);
       }
     }
+    const { settings } = useSettingsStore.getState();
     set({
       isRunning: false,
       currentState: 'idle',
       currentTopicId: null,
-      timeRemaining: get().settings.focusDuration * 60,
+      timeRemaining: settings.pomodoro.focusDuration * 60,
       elapsedSeconds: 0,
     });
   },
   
   skipToNext: () => {
-    const { currentState, currentTopicId, settings, elapsedSeconds } = get();
+    const { currentState, currentTopicId, elapsedSeconds } = get();
+    const { settings } = useSettingsStore.getState();
 
     if (currentState === 'focus' && currentTopicId) {
       // Salva o tempo decorrido ou a sessão completa
-      const durationToSave = elapsedSeconds > 0 ? Math.floor(elapsedSeconds / 60) : settings.focusDuration;
+      const durationToSave = elapsedSeconds > 0 ? Math.floor(elapsedSeconds / 60) : settings.pomodoro.focusDuration;
       if (durationToSave > 0) {
         get().addSession(currentTopicId, durationToSave);
       }
@@ -139,7 +118,8 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
 
   _advanceState: () => {
-    const { currentState, completedPomodoros, settings } = get();
+    const { currentState, completedPomodoros } = get();
+    const { settings } = useSettingsStore.getState();
     let nextState: PomodoroState;
     let nextTimeRemaining: number;
 
@@ -147,16 +127,16 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       const newCompleted = completedPomodoros + 1;
       set({ completedPomodoros: newCompleted });
 
-      if (newCompleted % settings.longBreakInterval === 0) {
+      if (newCompleted % settings.pomodoro.longBreakInterval === 0) {
         nextState = 'longBreak';
-        nextTimeRemaining = settings.longBreakDuration * 60;
+        nextTimeRemaining = settings.pomodoro.longBreakDuration * 60;
       } else {
         nextState = 'shortBreak';
-        nextTimeRemaining = settings.shortBreakDuration * 60;
+        nextTimeRemaining = settings.pomodoro.shortBreakDuration * 60;
       }
     } else { // Se estava em pausa curta ou longa
       nextState = 'focus';
-      nextTimeRemaining = settings.focusDuration * 60;
+      nextTimeRemaining = settings.pomodoro.focusDuration * 60;
     }
     
     set({
@@ -165,38 +145,6 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       elapsedSeconds: 0,
       isRunning: true, // Continua rodando no próximo estado
     });
-  },
-  
-  updateSettings: async (newSettings) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const currentSettings = get().settings;
-    const updatedPomodoroSettings = { ...currentSettings, ...newSettings };
-    set({ settings: updatedPomodoroSettings });
-
-    // Pega as configurações gerais existentes para não sobrescrevê-las
-    const { data: existingSettingsData } = await supabase
-      .from('user_settings')
-      .select('settings')
-      .eq('user_id', user.id)
-      .single();
-
-    const existingSettings = existingSettingsData?.settings || {};
-
-    const updatedGeneralSettings = {
-      ...existingSettings,
-      pomodoro: updatedPomodoroSettings, // Aninha as configs do pomodoro
-    };
-
-    const { error } = await supabase
-      .from('user_settings')
-      .upsert({ user_id: user.id, settings: updatedGeneralSettings });
-
-    if (error) {
-      console.error('Error updating settings:', error);
-      // Optionally revert state
-    }
   },
   
   incrementElapsedTime: (seconds) => {
