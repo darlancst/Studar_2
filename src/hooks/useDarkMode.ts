@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/store/settingsStore';
  * @returns Booleano indicando se o modo escuro está ativado
  */
 export function useDarkMode() {
-  const { darkMode } = useSettingsStore();
+  const darkMode = useSettingsStore((state) => state.settings.darkMode);
   const [isDark, setIsDark] = useState(darkMode);
   
   // Atualiza o estado quando darkMode mudar
