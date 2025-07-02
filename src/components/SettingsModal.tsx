@@ -32,17 +32,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     resetAllData, 
     setWeeklyGoal,
     setReviewIntervals,
-    setPomodoroSettings,
   } = useSettingsStore(state => ({
     settings: state.settings,
     toggleDarkMode: state.toggleDarkMode,
     resetAllData: state.resetAllData,
     setWeeklyGoal: state.setWeeklyGoal,
     setReviewIntervals: state.setReviewIntervals,
-    setPomodoroSettings: state.setPomodoroSettings,
   }));
 
-  const { darkMode, weeklyGoal, reviewIntervals, heatmapThresholds, pomodoro } = settings;
+  const { darkMode, weeklyGoal, reviewIntervals, heatmapThresholds } = settings;
   
   // Estado para gerenciar o valor da meta semanal no formulário
   const [goalHours, setGoalHours] = useState(Math.floor(weeklyGoal / 60));
@@ -55,15 +53,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   // Estado para gerenciar os limiares de tempo do heatmap
   const [thresholds, setThresholds] = useState<HeatmapThresholds>({...heatmapThresholds});
 
-  // Estado para gerenciar os valores do Pomodoro no formulário
-  const [pomodoroForm, setPomodoroForm] = useState({ ...pomodoro });
-
   // Atualizar o estado local quando as configurações mudarem
   useEffect(() => {
     setIntervals(reviewIntervals);
     setThresholds({...heatmapThresholds});
-    setPomodoroForm({ ...pomodoro });
-  }, [reviewIntervals, heatmapThresholds, pomodoro]);
+  }, [reviewIntervals, heatmapThresholds]);
 
   // Função para atualizar a meta de tempo semanal
   const handleUpdateWeeklyGoal = () => {
@@ -144,14 +138,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const handleConfirmReset = () => {
     resetAllData();
     setShowResetConfirm(false);
-  };
-
-  const handlePomodoroChange = (field: keyof typeof pomodoro, value: number) => {
-    setPomodoroForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleUpdatePomodoro = () => {
-    setPomodoroSettings(pomodoroForm);
   };
 
   return (
@@ -441,65 +427,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-          
-          {/* Seção de Pomodoro */}
-          <div className="pb-4 border-b dark:border-gray-700">
-            <div className="flex items-center mb-4">
-              <ClockIcon className="h-5 w-5 mr-2 text-red-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Pomodoro</h3>
-            </div>
-            <div className="space-y-4">
-              {/* Duração do Foco */}
-              <div>
-                <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Duração do Foco (minutos)
-                </label>
-                <input
-                  type="number"
-                  id="focusDuration"
-                  min="1"
-                  className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm p-2"
-                  value={pomodoroForm.focusDuration}
-                  onChange={(e) => handlePomodoroChange('focusDuration', parseInt(e.target.value) || 1)}
-                />
-              </div>
-              {/* Duração da Pausa Curta */}
-              <div>
-                <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Pausa Curta (minutos)
-                </label>
-                <input
-                  type="number"
-                  id="shortBreakDuration"
-                  min="1"
-                  className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm p-2"
-                  value={pomodoroForm.shortBreakDuration}
-                  onChange={(e) => handlePomodoroChange('shortBreakDuration', parseInt(e.target.value) || 1)}
-                />
-              </div>
-              {/* Duração da Pausa Longa */}
-              <div>
-                <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Pausa Longa (minutos)
-                </label>
-                <input
-                  type="number"
-                  id="longBreakDuration"
-                  min="1"
-                  className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm p-2"
-                  value={pomodoroForm.longBreakDuration}
-                  onChange={(e) => handlePomodoroChange('longBreakDuration', parseInt(e.target.value) || 1)}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleUpdatePomodoro}
-                className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-              >
-                Salvar Configurações do Pomodoro
-              </button>
             </div>
           </div>
           

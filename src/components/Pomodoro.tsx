@@ -5,11 +5,14 @@ import { usePomodoroStore } from '../store/pomodoroStore';
 import { useTopicStore, type Topic } from '../store/topicStore';
 import { useSubjectStore } from '../store/subjectStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { FaForward, FaRedo } from 'react-icons/fa';
+import { FaForward, FaRedo, FaCog } from 'react-icons/fa';
 import { isSameDay } from 'date-fns';
 
 export default function Pomodoro() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
   const { topics, fetchTopics } = useTopicStore(
     useCallback(state => ({
@@ -20,7 +23,8 @@ export default function Pomodoro() {
   
   const subjects = useSubjectStore(state => state.subjects);
   
-  const { settings } = useSettingsStore();
+  const { settings, setPomodoroSettings } = useSettingsStore();
+  const [pomodoroForm, setPomodoroForm] = useState({ ...settings.pomodoro });
 
   const {
     currentTopicId,
@@ -72,6 +76,10 @@ export default function Pomodoro() {
     };
   }, [isRunning, skipToNext]);
 
+  useEffect(() => {
+    setPomodoroForm({ ...settings.pomodoro });
+  }, [settings.pomodoro]);
+
   const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTopicId = e.target.value || null;
     const { currentTopicId: previousTopicId, elapsedSeconds } = usePomodoroStore.getState();
@@ -84,7 +92,7 @@ export default function Pomodoro() {
       currentTopicId: newTopicId,
       currentState: 'idle',
       isRunning: false,
-      timeRemaining: settings.pomodoro.focusDuration * 60,
+      timeRemaining: pomodoroForm.focusDuration * 60,
       elapsedSeconds: 0,
     });
   };
@@ -114,10 +122,56 @@ export default function Pomodoro() {
     return 'Iniciar';
   };
 
+  const handlePomodoroChange = (field: keyof typeof pomodoroForm, value: string) => {
+    const numericValue = parseInt(value, 10);
+    if (!isNaN(numericValue) && numericValue > 0) {
+      setPomodoroForm(prev => ({ ...prev, [field]: numericValue }));
+    }
+  };
+
+  const handleUpdatePomodoro = () => {
+    setPomodoroSettings(pomodoroForm);
+    setShowSaveConfirmation(true);
+    setTimeout(() => setShowSaveConfirmation(false), 2000);
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Pomodoro</h2>
-      
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">Pomodoro</h2>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+          aria-label="Configurações do Pomodoro"
+        >
+          <FaCog />
+        </button>
+      </div>
+
+      {showSettings && (
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
+          <h3 className="font-medium text-gray-800 dark:text-gray-200">Ajustar Tempos</h3>
+          <div>
+            <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
+            <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          </div>
+          <div>
+            <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
+            <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          </div>
+          <div>
+            <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
+            <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={handleUpdatePomodoro} className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium">
+              Salvar
+            </button>
+            {showSaveConfirmation && <span className="text-sm text-green-600 dark:text-green-400">Salvo!</span>}
+          </div>
+        </div>
+      )}
+
       <div className="topic-selector mb-4">
         <label htmlFor="topic-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Tópico Atual
