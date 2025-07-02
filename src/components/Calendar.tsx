@@ -252,42 +252,28 @@ function DayDetails({ date, topics, reviews, onClose, onCompleteReview, onTopicA
   );
 }
 
-export default function Calendar() {
-  const [currentMonth, setCurrentMonth] = useState<Date | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+function CalendarView({ initialDate }: { initialDate: Date }) {
+  const [currentMonth, setCurrentMonth] = useState(initialDate);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
   const [showDayDetails, setShowDayDetails] = useState(false);
   const [dayTopics, setDayTopics] = useState<Topic[]>([]);
   const [dayReviews, setDayReviews] = useState<Review[]>([]);
-  
-  // Define a data inicial apenas no lado do cliente para evitar erro de hidratação
-  useEffect(() => {
-    const today = new Date();
-    setCurrentMonth(today);
-    setSelectedDate(today);
-  }, []);
   
   const { subjects } = useSubjectStore();
   const { topics, deleteTopic } = useTopicStore();
   const { reviews, toggleReviewCompletion } = useReviewStore();
   const darkMode = useSettingsStore((state) => state.settings.darkMode);
   
-  // Dias do mês atual
+  // A lógica que antes estava no Calendar agora vive aqui, com a garantia de que as datas não são nulas.
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   
-  // Determinar o primeiro e último dia da grade do calendário
-  // Começamos com o domingo anterior ao primeiro dia do mês
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  // Terminamos com o sábado após o último dia do mês
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   
-  // Gerar todos os dias a serem exibidos no calendário (incluindo dias de meses adjacentes)
   const daysInGrid = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-  
-  // Dias da semana
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   
-  // Navegar entre meses
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const goToToday = () => {
@@ -297,7 +283,6 @@ export default function Calendar() {
     updateSelectedDayInfo(today);
   };
   
-  // Filtra tópicos e revisões para um dia específico
   const getTopicsForDay = (day: Date) => {
     return topics.filter(topic => {
       try {
@@ -317,86 +302,40 @@ export default function Calendar() {
     });
   };
   
-  // Atualiza as informações do dia selecionado
   const updateSelectedDayInfo = (day: Date) => {
     setDayTopics(getTopicsForDay(day));
     setDayReviews(getReviewsForDay(day));
   };
   
-  // Efeito para atualizar informações quando selecionar um novo dia
   useEffect(() => {
     updateSelectedDayInfo(selectedDate);
-  }, [selectedDate, topics]);
+  }, [selectedDate, topics, reviews]);
   
-  // Atualiza para usar a função de toggle
   const handleToggleReview = (reviewId: string) => {
-    toggleReviewCompletion(reviewId); 
-    // Força a atualização das revisões do dia selecionado para refletir a mudança no modal
+    toggleReviewCompletion(reviewId);
     setDayReviews(prevReviews => 
       prevReviews.map(r => 
-        r.id === reviewId ? { ...r, completed: !r.completed, date: !r.completed ? new Date() : r.scheduledDate } : r
+        r.id === reviewId ? { ...r, completed: !r.completed } : r
       )
     );
   };
 
-  // Manipula o clique em um dia
   const handleDayClick = (day: Date) => {
     setSelectedDate(day);
     updateSelectedDayInfo(day);
     setShowDayDetails(true);
   };
   
-  // Atualiza a lista de tópicos quando um novo é adicionado
   const handleTopicAdded = (topic: Topic) => {
-    // Simplesmente adiciona o tópico ao estado local, sem recarregar depois
     setDayTopics(prev => [...prev, topic]);
   };
   
-  // Verifica se tem tarefas para o dia selecionado
-  const hasTasks = dayTopics.length > 0 || dayReviews.length > 0;
-  
-  // NEW function to handle topic deletion
   const handleDeleteTopic = (topicId: string) => {
-    // Optional: Add a confirmation dialog here
-    // if (!window.confirm("Tem certeza que deseja excluir este tópico e suas revisões associadas?")) {
-    //   return;
-    // }
-    deleteTopic(topicId); // Delete from store (this will also delete associated reviews)
-    setDayTopics(prevTopics => prevTopics.filter(t => t.id !== topicId)); // Update local state for summary
-    // If DayDetails modal is open and showing this topic, it will also need to reflect this.
-    // The modal receives dayTopics as a prop, so this update should propagate.
-    // However, the `topics` prop for DayDetails comes from `dayTopics`, which is now updated.
+    deleteTopic(topicId);
+    setDayTopics(prevTopics => prevTopics.filter(t => t.id !== topicId));
   };
   
-  // Exibe um esqueleto de carregamento até que as datas estejam prontas no cliente
-  if (!currentMonth || !selectedDate) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col p-4 animate-pulse">
-        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="flex space-x-2">
-            <div className="h-8 w-16 bg-gray-300 dark:bg-gray-700 rounded-md"></div>
-            <div className="h-8 w-8 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-          </div>
-        </div>
-        <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-900">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="p-2 h-8">
-              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mx-auto"></div>
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 flex-grow">
-          {Array.from({ length: 35 }).map((_, i) => (
-            <div key={i} className="h-20 border-t border-r dark:border-gray-700 p-1">
-              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  
+  // O JSX do calendário original vem para cá.
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col">
       <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
@@ -597,7 +536,7 @@ export default function Calendar() {
           </button>
         </div>
         
-        {hasTasks ? (
+        {dayTopics.length > 0 || dayReviews.length > 0 ? (
           <div className="space-y-3">
             {/* Tópicos do dia */}
             {dayTopics.length > 0 && (
@@ -765,4 +704,42 @@ export default function Calendar() {
       `}</style>
     </div>
   );
+}
+
+export default function Calendar() {
+  const [initialDate, setInitialDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setInitialDate(new Date());
+  }, []);
+
+  if (!initialDate) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col p-4 animate-pulse">
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="flex space-x-2">
+            <div className="h-8 w-16 bg-gray-300 dark:bg-gray-700 rounded-md"></div>
+            <div className="h-8 w-8 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-900">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="p-2 h-8">
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mx-auto"></div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 flex-grow">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <div key={i} className="h-20 border-t border-r dark:border-gray-700 p-1">
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return <CalendarView initialDate={initialDate} />;
 } 
