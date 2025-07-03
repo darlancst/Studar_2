@@ -2,10 +2,10 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { usePomodoroStore } from '../store/pomodoroStore';
-import { useTopicStore, type Topic } from '../store/topicStore';
+import { useTopicStore } from '../store/topicStore';
 import { useSubjectStore } from '../store/subjectStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { FaForward, FaRedo, FaCog } from 'react-icons/fa';
+import { FaPlay, FaPause, FaForward, FaRedo, FaCog } from 'react-icons/fa';
 import { isSameDay } from 'date-fns';
 
 export default function Pomodoro() {
@@ -100,7 +100,6 @@ export default function Pomodoro() {
   const todaysTopics = topics.filter(topic => isSameDay(new Date(topic.createdAt), new Date()));
   const displayMinutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
   const displaySeconds = (timeRemaining % 60).toString().padStart(2, '0');
-  const displaySessionMinutes = Math.floor(elapsedSeconds / 60);
 
   const handlePlayPause = () => {
     if (isRunning) {
@@ -116,12 +115,6 @@ export default function Pomodoro() {
     }
   };
 
-  const getButtonLabel = () => {
-    if (isRunning) return 'Pausar';
-    if (currentState !== 'idle' || elapsedSeconds > 0) return 'Retomar';
-    return 'Iniciar';
-  };
-
   const handlePomodoroChange = (field: keyof typeof pomodoroForm, value: string) => {
     const numericValue = parseInt(value, 10);
     if (!isNaN(numericValue) && numericValue > 0) {
@@ -135,59 +128,126 @@ export default function Pomodoro() {
     setTimeout(() => setShowSaveConfirmation(false), 2000);
   };
 
+  const getTotalTime = () => {
+    switch (currentState) {
+      case 'focus':
+        return settings.pomodoro.focusDuration * 60;
+      case 'shortBreak':
+        return settings.pomodoro.shortBreakDuration * 60;
+      case 'longBreak':
+        return settings.pomodoro.longBreakDuration * 60;
+      default:
+        return settings.pomodoro.focusDuration * 60;
+    }
+  };
+
+  const totalTime = getTotalTime();
+  const progress = totalTime > 0 ? (totalTime - timeRemaining) / totalTime : 0;
+  const circumference = 2 * Math.PI * 110;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  const stateText = {
+    focus: 'Foco',
+    shortBreak: 'Pausa Curta',
+    longBreak: 'Pausa Longa',
+    idle: 'Pronto?',
+  }[currentState];
+
+  const currentTopic = topics.find(t => t.id === currentTopicId);
+  const currentSubject = currentTopic ? subjects.find(s => s.id === currentTopic.subjectId) : null;
+  const subjectColor = currentSubject?.color || '#a855f7';
+  
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">Pomodoro</h2>
+    <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 max-w-md mx-auto">
+      <div className="w-full flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: subjectColor }}></div>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                {currentTopic ? `${currentSubject?.name} - ${currentTopic.title}` : 'Nenhum tópico selecionado'}
+            </span>
+        </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white transition-colors"
           aria-label="Configurações do Pomodoro"
         >
-          <FaCog />
+          <FaCog size={20} />
         </button>
       </div>
 
       {showSettings && (
-        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
-          <h3 className="font-medium text-gray-800 dark:text-gray-200">Ajustar Tempos</h3>
-          <div>
-            <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
-            <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
-          </div>
-          <div>
-            <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
-            <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
-          </div>
-          <div>
-            <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
-            <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+        <div className="w-full mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4 transition-all duration-300">
+          <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-200">Ajustar Tempos</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+                <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
+                <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            </div>
+            <div>
+                <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
+                <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            </div>
+            <div>
+                <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
+                <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={handleUpdatePomodoro} className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium">
+            <button onClick={handleUpdatePomodoro} className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
               Salvar
             </button>
-            {showSaveConfirmation && <span className="text-sm text-green-600 dark:text-green-400">Salvo!</span>}
+            {showSaveConfirmation && <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">Salvo!</span>}
           </div>
         </div>
       )}
 
-      <div className="topic-selector mb-4">
-        <label htmlFor="topic-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Tópico Atual
-        </label>
+    <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center my-6">
+        <svg className="absolute w-full h-full transform -rotate-90">
+            <circle
+                cx="50%"
+                cy="50%"
+                r="110"
+                strokeWidth="12"
+                className="text-gray-200 dark:text-gray-600"
+                fill="transparent"
+                stroke="currentColor"
+            />
+            <circle
+                cx="50%"
+                cy="50%"
+                r="110"
+                strokeWidth="12"
+                className="transition-all duration-300 ease-linear"
+                fill="transparent"
+                stroke="currentColor"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                style={{ color: subjectColor }}
+            />
+        </svg>
+        <div className="relative text-center">
+            <h1 className="text-5xl sm:text-6xl font-bold text-gray-800 dark:text-gray-100 tabular-nums">
+                {displayMinutes}:{displaySeconds}
+            </h1>
+            <p className="text-lg text-gray-500 dark:text-gray-400 mt-2">{stateText}</p>
+        </div>
+    </div>
+    
+      <div className="w-full mb-6">
+        <label htmlFor="topic-select" className="sr-only">Tópico Atual</label>
         <select
           id="topic-select"
           value={currentTopicId || ''}
           onChange={handleTopicChange}
-          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          className="w-full p-3 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 transition-all"
           disabled={isRunning && currentState === 'focus'}
         >
-          <option value="">Selecione um tópico</option>
+          <option value="">Selecione um tópico para começar</option>
           {todaysTopics.map((topic) => {
             const subject = subjects.find((s) => s.id === topic.subjectId);
             return (
-              <option key={topic.id} value={topic.id}>
+              <option key={topic.id} value={topic.id} className="font-medium">
                 {subject?.name} - {topic.title}
               </option>
             );
@@ -195,37 +255,36 @@ export default function Pomodoro() {
         </select>
       </div>
 
-      <div className="timer-display">
-        <div className="time">{displayMinutes}:{displaySeconds}</div>
-        <div className="state">
-          {currentState === 'focus' ? 'Foco' : currentState === 'shortBreak' ? 'Pausa Curta' : currentState === 'longBreak' ? 'Pausa Longa' : 'Pronto?'}
-        </div>
-      </div>
-
-      <div className="session-info">
-        <p>Pomodoros Concluídos: {completedPomodoros}</p>
-        {displaySessionMinutes > 0 && (
-          <p>Minutos de Foco na Sessão: {displaySessionMinutes}</p>
-        )}
-      </div>
-
-      <div className="timer-controls">
+      <div className="flex items-center justify-center space-x-4 w-full">
+        <button 
+          onClick={() => resetTimer(true)} 
+          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+          title="Resetar e Salvar"
+          aria-label="Resetar timer e salvar progresso"
+        >
+          <FaRedo size={20}/>
+        </button>
         <button
           onClick={handlePlayPause}
-          className={`timer-button bg-primary-600 text-white hover:bg-primary-700 ${
-            !currentTopicId ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className="w-20 h-20 rounded-full text-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform"
+          style={{ backgroundColor: subjectColor }}
           disabled={!currentTopicId}
+          aria-label={isRunning ? 'Pausar timer' : 'Iniciar timer'}
         >
-          {getButtonLabel()}
+          {isRunning ? <FaPause size={28} /> : <FaPlay size={28} />}
         </button>
-        
-        <button onClick={() => skipToNext()} className="control-button" title="Pular para o próximo estado">
-          <FaForward />
+        <button 
+          onClick={() => skipToNext()} 
+          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+          title="Pular"
+          aria-label="Pular para o próximo estado"
+        >
+          <FaForward size={20}/>
         </button>
-        <button onClick={() => resetTimer(true)} className="control-button" title="Resetar o timer e salvar progresso">
-          <FaRedo />
-        </button>
+      </div>
+      
+      <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        <p>Pomodoros concluídos: <span className="font-bold">{completedPomodoros}</span></p>
       </div>
     </div>
   );
