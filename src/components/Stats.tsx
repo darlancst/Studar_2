@@ -915,12 +915,13 @@ export default function Stats() {
                   ? ['#4f46e530', '#4f46e545', '#6366f160', '#7c3aed75', '#9333ea85', '#a855f790'] 
                   : ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
                 
+                const { level1, level2, level3, level4, level5 } = settings.heatmapThresholds;
                 // Usa os limiares personalizados do store
-                if (count < heatmapThresholds.level1) return colorLevels[0];
-                if (count < heatmapThresholds.level2) return colorLevels[1];
-                if (count < heatmapThresholds.level3) return colorLevels[2];
-                if (count < heatmapThresholds.level4) return colorLevels[3];
-                if (count < heatmapThresholds.level5) return colorLevels[4];
+                if (count < level1) return colorLevels[0];
+                if (count < level2) return colorLevels[1];
+                if (count < level3) return colorLevels[2];
+                if (count < level4) return colorLevels[3];
+                if (count < level5) return colorLevels[4];
                 return colorLevels[5];
               };
               
@@ -1124,12 +1125,12 @@ export default function Stats() {
             {/* Array com informações dos níveis */}
             {[
               { level: 0, label: '0 min', range: 'Nenhum estudo' },
-              { level: 1, label: `1-${heatmapThresholds.level1-1} min`, range: `Menos de ${heatmapThresholds.level1} minutos` },
-              { level: 2, label: `${heatmapThresholds.level1}-${heatmapThresholds.level2-1} min`, range: `Entre ${heatmapThresholds.level1} e ${heatmapThresholds.level2} minutos` },
-              { level: 3, label: `${heatmapThresholds.level2}-${heatmapThresholds.level3-1} min`, range: `Entre ${heatmapThresholds.level2} e ${heatmapThresholds.level3} minutos` },
-              { level: 4, label: `${heatmapThresholds.level3}-${heatmapThresholds.level4-1} min`, range: `Entre ${heatmapThresholds.level3} e ${heatmapThresholds.level4} minutos` },
-              { level: 5, label: `${heatmapThresholds.level4}-${heatmapThresholds.level5-1} min`, range: `Entre ${heatmapThresholds.level4} e ${heatmapThresholds.level5} minutos` },
-              { level: 6, label: `${heatmapThresholds.level5}+ min`, range: `Mais de ${heatmapThresholds.level5} minutos` }
+              { level: 1, label: `1-${settings.heatmapThresholds.level1-1} min`, range: `Menos de ${settings.heatmapThresholds.level1} minutos` },
+              { level: 2, label: `${settings.heatmapThresholds.level1}-${settings.heatmapThresholds.level2-1} min`, range: `Entre ${settings.heatmapThresholds.level1} e ${settings.heatmapThresholds.level2} minutos` },
+              { level: 3, label: `${settings.heatmapThresholds.level2}-${settings.heatmapThresholds.level3-1} min`, range: `Entre ${settings.heatmapThresholds.level2} e ${settings.heatmapThresholds.level3} minutos` },
+              { level: 4, label: `${settings.heatmapThresholds.level3}-${settings.heatmapThresholds.level4-1} min`, range: `Entre ${settings.heatmapThresholds.level3} e ${settings.heatmapThresholds.level4} minutos` },
+              { level: 5, label: `${settings.heatmapThresholds.level4}-${settings.heatmapThresholds.level5-1} min`, range: `Entre ${settings.heatmapThresholds.level4} e ${settings.heatmapThresholds.level5} minutos` },
+              { level: 6, label: `${settings.heatmapThresholds.level5}+ min`, range: `Mais de ${settings.heatmapThresholds.level5} minutos` }
             ].map((item) => (
               <div 
                 key={item.level}
