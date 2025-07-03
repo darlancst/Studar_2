@@ -385,9 +385,8 @@ export default function Stats() {
         {
           data: data.map(d => d.value),
           backgroundColor: data.map(d => `${d.color}BF`), // Ex: 'BF' para 75% opacidade
-          borderColor: isDarkMode ? '#374151' : '#ffffff', // Borda para separar fatias
-          borderWidth: 2,
-          hoverOffset: 8,
+          borderColor: data.map(d => d.color),
+          borderWidth: 1,
         },
       ],
     };
@@ -425,26 +424,11 @@ export default function Stats() {
       labels,
       datasets: [
         {
-          label: 'Minutos Estudados',
-          data: data,
-          fill: true,
-          backgroundColor: (context: any) => {
-            const chart = context.chart;
-            const { ctx, chartArea } = chart;
-            if (!chartArea) return null;
-
-            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-            const primaryColor = '#4f46e5'; // Cor primária (indigo-600)
-            gradient.addColorStop(0, `${primaryColor}00`); // Totalmente transparente na base
-            gradient.addColorStop(1, `${primaryColor}4D`); // 30% de opacidade no topo
-            return gradient;
-          },
-          borderColor: '#4f46e5', // Cor primária (indigo-600)
-          pointBackgroundColor: '#4f46e5',
-          pointBorderColor: '#ffffff',
-          pointHoverBackgroundColor: '#ffffff',
-          pointHoverBorderColor: '#4f46e5',
-          tension: 0.4, // Linhas curvas
+          label: 'Tempo de estudo (min)',
+          data,
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.5)',
+          tension: 0.2,
         },
       ],
     };
@@ -601,8 +585,10 @@ export default function Stats() {
   const pieChartData = getPieChartData();
   const lineChartData = getLineChartData();
   
-  const getChartOptions = (mergeOptions: any = {}) => {
-    const textColor = isDarkMode ? '#e5e7eb' : '#374151';
+  const getChartOptions = (chartType: 'pie' | 'line') => {
+    const textColor = isDarkMode ? '#e5e7eb' : '#374151'; // gray-200 : gray-700
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const tooltipBackgroundColor = isDarkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.8)';
 
     const baseOptions = {
       responsive: true,
@@ -612,52 +598,97 @@ export default function Stats() {
           labels: {
             color: textColor,
             font: {
-              family: "'Inter', sans-serif",
+              family: 'Inter, sans-serif',
             },
           },
         },
-        title: {
-          display: true,
-          color: textColor,
-          font: {
-            family: "'Inter', sans-serif",
-            size: 16,
-            weight: 'bold',
-          },
-        },
         tooltip: {
-          enabled: true,
-          backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.75)' : 'rgba(255, 255, 255, 0.75)',
-          titleColor: isDarkMode ? '#f9fafb' : '#111827',
-          bodyColor: isDarkMode ? '#e5e7eb' : '#374151',
-          borderColor: isDarkMode ? '#4b5563' : '#e5e7eb',
+          backgroundColor: tooltipBackgroundColor,
+          titleColor: textColor,
+          bodyColor: textColor,
+          borderColor: gridColor,
           borderWidth: 1,
           cornerRadius: 8,
-          padding: 12,
-          backdropFilter: 'blur(4px)',
+          padding: 10,
           callbacks: {
-            label: function(context: TooltipItem<any>) {
-              let label = context.dataset.label || '';
-              // Gráfico de Linha (ou outros cartesianos)
-              if (context.parsed.y !== undefined) {
-                label = ` Minutos: ${context.parsed.y}`;
-              } 
-              // Gráfico de Pizza
-              else if (context.parsed !== null) {
-                const total = (context.chart as any).getDatasetMeta(0).total || 1;
-                const percentage = ((context.parsed / total) * 100).toFixed(2);
-                label = ` ${context.label}: ${formatStudyTime(context.parsed)} (${percentage}%)`;
+            label: (context: TooltipItem<'pie' | 'line'>) => {
+              if (chartType === 'pie') {
+                const data = context.chart.data.datasets[0].data.filter(v => typeof v === 'number') as number[];
+                const total = data.reduce((acc, val) => acc + val, 0);
+                const value = context.raw as number;
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return `${context.label}: ${formatStudyTime(value)} (${percentage}%)`;
               }
-              return label;
+              const value = context.raw as number;
+              return `${context.dataset.label}: ${formatStudyTime(value)}`;
             }
           }
         },
       },
-      // Deep merge custom options
-      ...mergeOptions,
     };
 
-    return baseOptions;
+    if (chartType === 'line') {
+      return {
+        ...baseOptions,
+        plugins: {
+          ...baseOptions.plugins,
+          title: {
+            display: true,
+            text: `Progresso ${getChartPeriodTitle(period)}`,
+            color: textColor,
+            font: { size: 16, family: 'Inter, sans-serif' },
+          },
+          legend: {
+            display: false,
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Minutos Estudados',
+              color: textColor,
+            },
+            ticks: { color: textColor },
+            grid: { color: gridColor },
+          },
+          x: {
+            ticks: { color: textColor },
+            grid: { display: false },
+          },
+        },
+        elements: {
+          line: {
+            tension: 0.3,
+            borderColor: '#8b5cf6', // primary-500
+            borderWidth: 2,
+          },
+          point: {
+            backgroundColor: '#8b5cf6',
+            radius: 4,
+            hoverRadius: 6,
+          },
+        },
+      };
+    }
+
+    return { // Pie chart options
+      ...baseOptions,
+      plugins: {
+        ...baseOptions.plugins,
+        title: {
+          display: true,
+          text: 'Distribuição do Tempo',
+          color: textColor,
+          font: { size: 16, family: 'Inter, sans-serif' },
+        },
+        legend: {
+          ...baseOptions.plugins.legend,
+          position: 'bottom' as const,
+        },
+      },
+    };
   };
 
   // Função para resetar todas as estatísticas
@@ -812,44 +843,19 @@ export default function Stats() {
       {/* Gráficos - com melhor responsividade */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
         {/* Gráfico de Pizza */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Distribuição do Tempo</h3>
-          {getPieChartData().labels.length > 0 ? (
-            <Pie data={getPieChartData()} options={getChartOptions({
-              plugins: {
-                title: { text: `Distribuição ${getChartPeriodTitle(period)}` },
-                legend: {
-                  position: 'top',
-                  align: 'start',
-                }
-              }
-            })} />
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-center h-96">
+          {pieChartData.labels.length > 0 ? (
+            <Pie data={pieChartData} options={getChartOptions('pie')} />
           ) : (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-full">
               <p className="text-gray-500">Sem dados de estudo no período.</p>
             </div>
           )}
         </div>
         
         {/* Gráfico de Linha */}
-        <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Progresso Diário</h3>
-          <Line data={getLineChartData()} options={getChartOptions({
-            plugins: {
-              title: { text: `Progresso ${getChartPeriodTitle(period)}` },
-              legend: { display: false },
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                title: { display: true, text: 'Minutos Estudados' },
-                grid: { color: isDarkMode ? '#4b5563' : '#e5e7eb' }
-              },
-              x: {
-                grid: { display: false }
-              }
-            }
-          })} />
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md h-96">
+          <Line data={lineChartData} options={getChartOptions('line')} />
         </div>
         
         {/* Heatmap de atividades - Agora com melhor responsividade */}
