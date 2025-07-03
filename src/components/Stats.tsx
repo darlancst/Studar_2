@@ -868,7 +868,7 @@ export default function Stats() {
           </div>
           
           {/* Heatmap de atividades - Agora com melhor responsividade */}
-          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md lg:col-span-5">
             <h3 className="text-lg font-medium mb-4 md:mb-6 text-center dark:text-white">Histórico de Atividades</h3>
             <div ref={heatmapScrollRef} className="w-full overflow-x-auto" 
                  aria-label="Histórico de atividades de estudo" 
