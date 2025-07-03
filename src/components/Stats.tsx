@@ -1236,14 +1236,14 @@ export default function Stats() {
             }
           }
           
-          /* Estilo para o calendário personalizado - NOVO ESTILO GITHUB */
+          /* Estilo para o calendário personalizado - Otimizado */
           .github-style-heatmap {
             display: flex;
             flex-direction: column;
             width: 100%;
             margin-top: 10px;
             gap: 8px;
-            ${isDarkMode ? 'filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));' : ''}
+            ${isDarkMode ? 'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);' : ''}
           }
           
           .centered-heatmap {
@@ -1343,7 +1343,6 @@ export default function Stats() {
             border-radius: 2px;
             transition: all 0.2s ease;
             position: relative;
-            ${isDarkMode ? 'backdrop-filter: blur(8px);' : ''}
             cursor: pointer;
           }
 
