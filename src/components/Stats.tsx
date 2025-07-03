@@ -216,15 +216,15 @@ export default function Stats() {
   
   // Formata o tempo de estudo
   const formatStudyTime = (minutes: number): string => {
-    if (minutes < 1) return '0 min';
+    if (minutes < 1) return '0m';
     
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     
     if (hours === 0) {
-      return `${minutes} min`;
+      return `${minutes}m`;
     } else {
-      return `${hours}h${remainingMinutes > 0 ? `:${remainingMinutes.toString().padStart(2, '0')}` : ''}`;
+      return `${hours}h${remainingMinutes > 0 ? `:${remainingMinutes.toString().padStart(2, '0')}m` : ''}`;
     }
   };
   
