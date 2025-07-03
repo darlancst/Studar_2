@@ -903,17 +903,17 @@ export default function Stats() {
                role="figure" 
                aria-description="Mapa de calor mostrando a frequência de sessões de estudo durante os últimos 12 meses">
             {(() => {
+              // Esquema de cores unificado para ser usado tanto na função getColor quanto na legenda
+              const colorLevels = isDarkMode 
+                ? ['#1e40af20', '#1e40af40', '#1d4ed860', '#2563eb80', '#3b82f6', '#60a5fa'] 
+                : ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
+
               // 1. Obter os dados para o heatmap de forma simplificada
               const heatmapData = getHeatMapData();
               
               // 2. Funções auxiliares para o heatmap
               const getColor = (count: number) => {
                 if (!count || count === 0) return isDarkMode ? '#2d3748' : '#f3f4f6';
-                
-                // Esquema de cores para diferentes níveis de atividade - melhor gradiente para modo escuro
-                const colorLevels = isDarkMode 
-                  ? ['#4f46e530', '#4f46e545', '#6366f160', '#7c3aed75', '#9333ea85', '#a855f790'] 
-                  : ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
                 
                 const { level1, level2, level3, level4, level5 } = settings.heatmapThresholds;
                 // Usa os limiares personalizados do store
@@ -1118,40 +1118,26 @@ export default function Stats() {
             })()}
           </div>
           
-          {/* Legenda de cores */}
-          <div className="color-scale-legend">
-            <span className="legend-text">Tempo de estudo:</span>
-            
-            {/* Array com informações dos níveis */}
+          {/* Legenda do Heatmap */}
+          <div className="flex justify-center items-center mt-4 space-x-2 text-xs text-gray-600 dark:text-gray-400">
+            <span>Menos</span>
             {[
-              { level: 0, label: '0 min', range: 'Nenhum estudo' },
-              { level: 1, label: `1-${settings.heatmapThresholds.level1-1} min`, range: `Menos de ${settings.heatmapThresholds.level1} minutos` },
-              { level: 2, label: `${settings.heatmapThresholds.level1}-${settings.heatmapThresholds.level2-1} min`, range: `Entre ${settings.heatmapThresholds.level1} e ${settings.heatmapThresholds.level2} minutos` },
-              { level: 3, label: `${settings.heatmapThresholds.level2}-${settings.heatmapThresholds.level3-1} min`, range: `Entre ${settings.heatmapThresholds.level2} e ${settings.heatmapThresholds.level3} minutos` },
-              { level: 4, label: `${settings.heatmapThresholds.level3}-${settings.heatmapThresholds.level4-1} min`, range: `Entre ${settings.heatmapThresholds.level3} e ${settings.heatmapThresholds.level4} minutos` },
-              { level: 5, label: `${settings.heatmapThresholds.level4}-${settings.heatmapThresholds.level5-1} min`, range: `Entre ${settings.heatmapThresholds.level4} e ${settings.heatmapThresholds.level5} minutos` },
-              { level: 6, label: `${settings.heatmapThresholds.level5}+ min`, range: `Mais de ${settings.heatmapThresholds.level5} minutos` }
+              { level: 0, color: isDarkMode ? '#2d3748' : '#f3f4f6' },
+              { level: 1, color: isDarkMode ? '#1e40af20' : '#dbeafe' },
+              { level: 2, color: isDarkMode ? '#1e40af40' : '#bfdbfe' },
+              { level: 3, color: isDarkMode ? '#1d4ed860' : '#93c5fd' },
+              { level: 4, color: isDarkMode ? '#2563eb80' : '#60a5fa' },
+              { level: 5, color: isDarkMode ? '#3b82f6' : '#3b82f6' },
+              { level: 6, color: isDarkMode ? '#60a5fa' : '#2563eb' }
             ].map((item) => (
-              <div 
+              <div
                 key={item.level}
-                className="legend-item"
-                title={item.range}
-              >
-                <div 
-                  className="color-box"
-                style={{ 
-                    backgroundColor: item.level === 0 
-                      ? (isDarkMode ? '#2d3748' : '#f3f4f6') 
-                      : isDarkMode 
-                        ? [`#4f46e530`, `#4f46e545`, `#6366f160`, `#7c3aed75`, `#9333ea85`, `#a855f790`][item.level-1]
-                        : [`#dbeafe`, `#bfdbfe`, `#93c5fd`, `#60a5fa`, `#3b82f6`, `#2563eb`][item.level-1],
-                    border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
-                  }}
-                  aria-label={item.range}
-              />
-                <span className="level-label">{item.label}</span>
-              </div>
+                className="w-3 h-3 rounded-sm"
+                style={{ backgroundColor: item.color }}
+                title={`Nível ${item.level}`}
+              ></div>
             ))}
+            <span>Mais</span>
           </div>
         </div>
       </div>
