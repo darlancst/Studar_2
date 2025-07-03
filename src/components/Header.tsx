@@ -49,10 +49,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 shadow-sm ${animateButton ? 'ring-2 ring-offset-2 ring-primary-500 dark:ring-offset-gray-900' : 'ring-0'}`}
+              className={`p-2 rounded-full text-yellow-500 hover:text-yellow-400 focus:outline-none transition-all duration-300 ${animateButton ? 'ring-2 ring-offset-2 ring-yellow-500 dark:ring-offset-gray-900' : ''}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
-              Visão Geral
+              <SparklesIcon className="h-6 w-6" aria-hidden="true" />
             </button>
             
             <button
@@ -68,10 +68,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
              <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 shadow-sm ${animateButton ? 'ring-2 ring-offset-2 ring-primary-500 dark:ring-offset-gray-900' : 'ring-0'}`}
+              className={`p-2 rounded-full text-yellow-500 hover:text-yellow-400 focus:outline-none transition-all duration-300 ${animateButton ? 'ring-2 ring-offset-2 ring-yellow-500 dark:ring-offset-gray-900' : ''}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
-              Visão Geral
+              <SparklesIcon className="h-6 w-6" aria-hidden="true" />
             </button>
             <button
               type="button"
