@@ -679,7 +679,7 @@ export default function Stats() {
         ...baseOptions.plugins,
         title: {
           display: false,
-          text: 'Distribuição do Tempo',
+          text: 'Distribuição de tempo por matéria',
           color: textColor,
           font: { size: 16, family: 'Inter, sans-serif' },
         },
@@ -846,7 +846,7 @@ export default function Stats() {
           {/* Gráfico de Pizza */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col h-96">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
-              Distribuição do Tempo <span className="text-primary-500">{getChartPeriodTitle(period)}</span>
+              Distribuição de tempo por matéria <span className="text-primary-500">{getChartPeriodTitle(period)}</span>
             </h3>
             <div className="flex-grow flex items-center justify-center">
               {pieChartData.labels.length > 0 ? (
