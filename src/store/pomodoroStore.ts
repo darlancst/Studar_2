@@ -25,8 +25,7 @@ interface PomodoroStore {
   pauseTimer: () => void;
   resetTimer: (saveProgress: boolean) => void;
   skipToNext: () => void;
-  incrementElapsedTime: (seconds: number) => void;
-  interruptFocusSession: (topicId: string, elapsedSeconds: number) => void;
+  tick: () => void;
   _advanceState: () => void;
   
   // Sessões Pomodoro
@@ -86,13 +85,8 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
   
   resetTimer: (saveProgress = false) => {
-    const { currentState, currentTopicId, elapsedSeconds } = get();
-    if (saveProgress && currentState === 'focus' && currentTopicId && elapsedSeconds > 0) {
-      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-      if (elapsedMinutes > 0) {
-        get().addSession(currentTopicId, elapsedMinutes);
-      }
-    }
+    // A lógica de salvar foi movida para a função tick().
+    // Esta função agora apenas reseta o estado do timer.
     const { settings } = useSettingsStore.getState();
     set({
       isRunning: false,
@@ -104,16 +98,9 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
   
   skipToNext: () => {
-    const { currentState, currentTopicId, elapsedSeconds } = get();
-    const { settings } = useSettingsStore.getState();
-
-    if (currentState === 'focus' && currentTopicId) {
-      // Salva o tempo decorrido ou a sessão completa
-      const durationToSave = elapsedSeconds > 0 ? Math.floor(elapsedSeconds / 60) : settings.pomodoro.focusDuration;
-      if (durationToSave > 0) {
-        get().addSession(currentTopicId, durationToSave);
-      }
-    }
+    // A lógica de salvar foi movida para a função tick().
+    // Quando uma sessão de foco termina (pulada ou finalizada), apenas avançamos o estado.
+    // Os minutos completos já foram salvos pelo tick.
     get()._advanceState(); // Avança para o próximo estado (pausa, etc.)
   },
 
@@ -147,18 +134,37 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     });
   },
   
-  incrementElapsedTime: (seconds) => {
-    // This is purely client-side state
-    set((state) => ({ elapsedSeconds: state.elapsedSeconds + seconds }));
+  tick: () => {
+    const { timeRemaining, currentState, currentTopicId, isRunning, elapsedSeconds } = get();
+
+    if (!isRunning) {
+      return;
+    }
+
+    // Finaliza a sessão se o tempo acabar
+    if (timeRemaining <= 1) {
+      // Antes de avançar, verifica se o último segundo completa um minuto que precisa ser salvo.
+      const newElapsedSecondsOnFinish = elapsedSeconds + 1;
+      if (currentState === 'focus' && currentTopicId && newElapsedSecondsOnFinish > 0 && newElapsedSecondsOnFinish % 60 === 0) {
+        get().addSession(currentTopicId, 1);
+      }
+      get().skipToNext();
+      return;
+    }
+
+    const newElapsedSeconds = elapsedSeconds + 1;
+
+    // Salva um bloco de 1 minuto toda vez que um minuto de foco se passa.
+    if (currentState === 'focus' && currentTopicId && newElapsedSeconds > 0 && newElapsedSeconds % 60 === 0) {
+      get().addSession(currentTopicId, 1);
+    }
+    
+    set({
+      timeRemaining: timeRemaining - 1,
+      elapsedSeconds: newElapsedSeconds,
+    });
   },
   
-  interruptFocusSession: (topicId, elapsedSeconds) => {
-    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-    if (elapsedMinutes > 0) {
-      get().addSession(topicId, elapsedMinutes);
-    }
-  },
-
   addSession: async (topicId, duration) => {
     if (duration <= 0) return;
     const { data: { user } } = await supabase.auth.getUser();

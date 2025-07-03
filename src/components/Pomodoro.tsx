@@ -40,7 +40,6 @@ export default function Pomodoro() {
     pauseTimer,
     resetTimer,
     skipToNext,
-    interruptFocusSession,
   } = usePomodoroStore.getState();
 
   useEffect(() => {
@@ -57,16 +56,7 @@ export default function Pomodoro() {
     }
 
     intervalRef.current = setInterval(() => {
-      usePomodoroStore.setState(state => {
-        if (state.timeRemaining <= 0) {
-          skipToNext();
-          return {};
-        }
-        return { 
-          timeRemaining: state.timeRemaining - 1,
-          elapsedSeconds: state.elapsedSeconds + 1 
-        };
-      });
+      usePomodoroStore.getState().tick();
     }, 1000);
 
     return () => {
@@ -74,7 +64,7 @@ export default function Pomodoro() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, skipToNext]);
+  }, [isRunning]);
 
   useEffect(() => {
     setPomodoroForm({ ...settings.pomodoro });
@@ -82,11 +72,6 @@ export default function Pomodoro() {
 
   const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTopicId = e.target.value || null;
-    const { currentTopicId: previousTopicId, elapsedSeconds } = usePomodoroStore.getState();
-
-    if (previousTopicId && previousTopicId !== newTopicId && elapsedSeconds > 0) {
-      interruptFocusSession(previousTopicId, elapsedSeconds);
-    }
     
     usePomodoroStore.setState({ 
       currentTopicId: newTopicId,
@@ -156,7 +141,7 @@ export default function Pomodoro() {
   const currentTopic = topics.find(t => t.id === currentTopicId);
   const currentSubject = currentTopic ? subjects.find(s => s.id === currentTopic.subjectId) : null;
   const subjectColor = currentSubject?.color || '#a855f7';
-  
+
   return (
     <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 max-w-md lg:max-w-lg mx-auto">
       <div className="w-full flex justify-between items-center mb-4">
@@ -179,17 +164,17 @@ export default function Pomodoro() {
         <div className="w-full mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4 transition-all duration-300">
           <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-200">Ajustar Tempos</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-                <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
-                <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
-            </div>
-            <div>
-                <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
-                <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
-            </div>
-            <div>
-                <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
-                <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          <div>
+            <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
+            <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          </div>
+          <div>
+            <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
+            <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+          </div>
+          <div>
+            <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
+            <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
             </div>
           </div>
           <div className="flex items-center gap-4">

@@ -66,7 +66,7 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
     
     return isSameDay(localDate, new Date());
   });
-
+  
   // Ordena as cores para colocar as indisponíveis no final
   const sortedColors = [...allColors].sort((a, b) => {
     const isAUsedByOther = usedColorsByOthers.includes(a);
@@ -371,18 +371,18 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
                   );
                 })}
               </div>
-              
+                    
               {/* Botão para carregar mais tópicos, se houver mais do que o visível */}
               {todaysTopics.length > visibleTopicCount && (
-                <div className="mt-4 text-center">
-                  <button
+                      <div className="mt-4 text-center">
+                        <button
                     onClick={() => setVisibleTopicCount(prev => prev + TOPIC_INCREMENT)}
                     className="text-primary-600 dark:text-primary-400 hover:underline text-sm font-medium"
-                  >
+                        >
                     Carregar Mais
-                  </button>
-                </div>
-              )}
+                        </button>
+                      </div>
+                    )}
             </>
           )}
         </div>
