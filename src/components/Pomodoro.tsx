@@ -119,6 +119,25 @@ export default function Pomodoro() {
 
   const handleUpdatePomodoro = () => {
     setPomodoroSettings(pomodoroForm);
+
+    // Atualiza o tempo restante no estado global se o timer não estiver rodando
+    const { isRunning, currentState } = usePomodoroStore.getState();
+    if (!isRunning) {
+      let newTimeRemaining: number | null = null;
+
+      if (currentState === 'focus' || currentState === 'idle') {
+        newTimeRemaining = pomodoroForm.focusDuration * 60;
+      } else if (currentState === 'shortBreak') {
+        newTimeRemaining = pomodoroForm.shortBreakDuration * 60;
+      } else if (currentState === 'longBreak') {
+        newTimeRemaining = pomodoroForm.longBreakDuration * 60;
+      }
+
+      if (newTimeRemaining !== null) {
+        usePomodoroStore.setState({ timeRemaining: newTimeRemaining });
+      }
+    }
+
     setShowSaveConfirmation(true);
     setTimeout(() => setShowSaveConfirmation(false), 2000);
   };
