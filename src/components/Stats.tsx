@@ -196,6 +196,24 @@ export default function Stats() {
     }
   };
 
+  // Retorna um nome amigável para o período para ser usado nos títulos dos gráficos
+  const getChartPeriodTitle = (p: StatsPeriod): string => {
+    switch (p) {
+      case 'today':
+        return 'de Hoje';
+      case 'week':
+        return 'da Semana';
+      case 'month':
+        return 'do Mês';
+      case 'annual':
+        return 'do Ano';
+      case 'custom':
+        return 'do Período';
+      default:
+        return '';
+    }
+  };
+
   // Formata o tempo de estudo
   const formatStudyTime = (minutes: number): string => {
     if (minutes < 1) return '0 min';
@@ -594,21 +612,22 @@ export default function Stats() {
   const lineOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    scales: { y: { beginAtZero: true, title: { display: true, text: 'Minutos' } } },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Minutos Estudados',
+        },
+      },
+    },
     plugins: {
-      legend: { position: 'bottom' as const },
-      title: { 
-        display: true, 
-        text: (() => {
-          switch (period) {
-            case 'today': return 'Progresso de Hoje';
-            case 'week': return 'Progresso Semanal';
-            case 'month': return 'Progresso Mensal';
-            case 'annual': return 'Progresso Anual';
-            case 'custom': return 'Progresso Personalizado';
-            default: return 'Progresso';
-          }
-        })()
+      legend: {
+        display: false,
+      },
+      title: {
+        display: true,
+        text: `Progresso ${getChartPeriodTitle(period)}`,
       },
     },
   };
