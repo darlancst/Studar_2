@@ -178,6 +178,24 @@ export default function Stats() {
     return { startDate, endDate };
   };
   
+  // Retorna um nome amigável para o período selecionado
+  const getPeriodDisplayName = (p: StatsPeriod): string => {
+    switch (p) {
+      case 'today':
+        return 'Hoje';
+      case 'week':
+        return 'na Semana';
+      case 'month':
+        return 'no Mês';
+      case 'annual':
+        return 'no Ano';
+      case 'custom':
+        return 'no Período';
+      default:
+        return '';
+    }
+  };
+
   // Formata o tempo de estudo
   const formatStudyTime = (minutes: number): string => {
     if (minutes < 1) return '0 min';
@@ -746,17 +764,6 @@ export default function Stats() {
           </div>
         </div>
         
-        {/* Card: Revisões Feitas */}
-        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{countCompletedReviews()}</p>
-          </div>
-          <div className="text-yellow-500 self-end">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-          </div>
-        </div>
-        
         {/* Card: Dias em Sequência */}
         <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
           <div>
@@ -768,10 +775,21 @@ export default function Stats() {
           </div>
         </div>
         
+        {/* Card: Revisões Feitas */}
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas <span className="text-primary-500">{getPeriodDisplayName(period)}</span></p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{countCompletedReviews()}</p>
+          </div>
+          <div className="text-yellow-500 self-end">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+          </div>
+        </div>
+        
         {/* Card: Revisões Pendentes */}
         <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Pendentes</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Pendentes <span className="text-primary-500">{getPeriodDisplayName(period)}</span></p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{countPendingReviews()}</p>
           </div>
           <div className="text-purple-500 self-end">
