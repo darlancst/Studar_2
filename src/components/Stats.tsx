@@ -274,30 +274,21 @@ export default function Stats() {
     return subjectMap;
   };
   
-  // Calcula o tempo total de estudo - SIMPLIFICADO
+  // Calcula o tempo total de estudo no período
   const calculateTotalStudyTime = (): number => {
-    // Pega o mapa de tempo por assunto já filtrado pelo período
-    const subjectMap = getSessionsBySubject();
-    let totalTimeFromSaved = 0;
-    subjectMap.forEach(value => {
-      totalTimeFromSaved += value.time;
-    });
-
-    // Retorna apenas o tempo total das sessões salvas
-    return totalTimeFromSaved;
-  };
-  
-  // Calcula o tempo médio por sessão Pomodoro
-  const calculateAverageSessionTime = (): number => {
     const filteredSessions = getFilteredPomodoroSessions();
     if (filteredSessions.length === 0) return 0;
-    const totalTime = filteredSessions.reduce((acc: number, session) => acc + session.duration, 0);
-    return Math.round(totalTime / filteredSessions.length);
+    return filteredSessions.reduce((acc, session) => acc + session.duration, 0);
   };
   
   // Conta as revisões completadas no período
   const countCompletedReviews = (): number => {
     return getFilteredReviews().filter(r => r.completed).length;
+  };
+
+  // Conta as revisões pendentes no período
+  const countPendingReviews = (): number => {
+    return getFilteredReviews().filter(r => !r.completed).length;
   };
 
   // Calcula a sequência de dias de estudo
@@ -359,33 +350,6 @@ export default function Stats() {
           data: data.map(d => d.value),
           backgroundColor: data.map(d => `${d.color}BF`), // Ex: 'BF' para 75% opacidade
           borderColor: data.map(d => d.color),
-          borderWidth: 1,
-        },
-      ],
-    };
-  };
-  
-  // Prepara dados para gráfico de barras (Revisões Completadas vs. Pendentes)
-  const getBarChartData = () => {
-    const filteredReviews = getFilteredReviews();
-    const completed = filteredReviews.filter(r => r.completed).length;
-    const pending = filteredReviews.filter(r => !r.completed).length;
-    
-    return {
-      labels: ['Revisões'],
-      datasets: [
-        {
-          label: 'Completadas',
-          data: [completed],
-          backgroundColor: 'rgba(75, 192, 192, 0.6)',
-          borderColor: 'rgba(75, 192, 192, 1)',
-          borderWidth: 1,
-        },
-        {
-          label: 'Pendentes',
-          data: [pending],
-          backgroundColor: 'rgba(255, 99, 132, 0.6)',
-          borderColor: 'rgba(255, 99, 132, 1)',
           borderWidth: 1,
         },
       ],
@@ -557,7 +521,6 @@ export default function Stats() {
   const today = new Date();
   const weekEndDate = endOfWeek(today, { weekStartsOn: 0 });
   const formattedWeekEndDate = format(weekEndDate, "dd 'de' MMMM", { locale: pt });
-  const averageSessionTime = calculateAverageSessionTime();
   const completedReviewsCount = countCompletedReviews();
   
   // Efeito para mostrar o confete quando a meta for atingida
@@ -584,7 +547,6 @@ export default function Stats() {
   const weeklyProgress = Math.min(100, Math.round((weeklyStudyTime / weeklyGoal) * 100));
   
   const pieChartData = getPieChartData();
-  const barChartData = getBarChartData();
   const lineChartData = getLineChartData();
   
   const pieOptions = {
@@ -608,23 +570,6 @@ export default function Stats() {
           }
         }
       }
-    },
-  };
-  
-  const barOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    indexAxis: 'y' as const, // Coloca as labels no eixo Y para melhor leitura
-    scales: {
-       x: { // Eixo X agora representa a contagem
-          beginAtZero: true,
-          title: { display: true, text: 'Quantidade' }
-       }
-       // Não precisa mais do eixo Y explícito para as labels
-    },
-    plugins: {
-      legend: { display: false }, // Legenda não é tão necessária com labels diretas
-      title: { display: true, text: 'Revisões Completadas vs. Pendentes' }, // Título está correto
     },
   };
   
@@ -823,38 +768,42 @@ export default function Stats() {
           </div>
         </div>
         
-        {/* Card: Sessão Média */}
+        {/* Card: Revisões Pendentes */}
         <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Sessão Média</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{calculateAverageSessionTime()} min</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Pendentes</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{countPendingReviews()}</p>
           </div>
           <div className="text-purple-500 self-end">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
           </div>
         </div>
       </div>
 
       {/* Gráficos - com melhor responsividade */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Gráfico de pizza */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
-          {pieChartData.labels.length > 0 ? (
-            <Pie data={pieChartData} options={getChartOptions(pieOptions)} />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+        {/* Gráfico de Pizza */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Distribuição do Tempo</h3>
+          {getPieChartData().labels.length > 0 ? (
+            <Pie data={getPieChartData()} options={getChartOptions({
+              plugins: {
+                legend: {
+                  position: 'top',
+                }
+              }
+            })} />
           ) : (
-            <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-              Sem dados de tempo para o período.
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-500">Sem dados de estudo no período.</p>
             </div>
           )}
         </div>
         
-        {/* Gráfico de barras */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
-          <Bar data={barChartData} options={getChartOptions(barOptions)} />
-        </div>
-        
-        {/* Gráfico de linha */}
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2 h-64 sm:h-80">
+        {/* Gráfico de Linha */}
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
           <Line data={lineChartData} options={getChartOptions(lineOptions)} />
         </div>
         
