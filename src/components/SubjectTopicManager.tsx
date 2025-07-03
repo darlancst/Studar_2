@@ -5,6 +5,7 @@ import { XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useSubjectStore } from '@/store/subjectStore';
 import { useTopicStore } from '@/store/topicStore';
 import { Subject, Topic } from '@/types';
+import { isSameDay, parseISO } from 'date-fns';
 
 interface SubjectTopicManagerProps {
   onClose: () => void;
@@ -52,6 +53,14 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
   
   const { topics, addTopic, updateTopic, deleteTopic } = useTopicStore();
   
+  // Filtra tópicos para mostrar apenas os de hoje
+  const todaysTopics = topics.filter(topic => {
+    const createdAtDate = typeof topic.createdAt === 'string' 
+      ? parseISO(topic.createdAt) 
+      : topic.createdAt;
+    return isSameDay(createdAtDate, new Date());
+  });
+
   // Ordena as cores para colocar as indisponíveis no final
   const sortedColors = [...allColors].sort((a, b) => {
     const isAUsedByOther = usedColorsByOthers.includes(a);
@@ -308,22 +317,10 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
                 </div>
               </form>
               
-              <h3 className="font-medium mb-2 dark:text-white">Tópicos</h3>
-              
-              {/* Ordena os tópicos por data de criação (mais recentes primeiro) */}
-              {(() => {
-                const sortedTopics = [...topics].sort((a, b) => 
-                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                );
-                
-                // Pega apenas a quantidade visível de tópicos
-                const visibleTopics = sortedTopics.slice(0, visibleTopicCount);
-
-                return (
-                  <>
+              <h3 className="font-medium mb-2 dark:text-white">Tópicos de Hoje</h3>
               <div className="space-y-2">
-                      {visibleTopics.map((topic) => {
-                  const subject = subjects.find((s) => s.id === topic.subjectId);
+                {todaysTopics.slice(0, visibleTopicCount).map((topic) => {
+                  const subject = subjects.find(s => s.id === topic.subjectId);
                   return (
                     <div
                       key={topic.id}
@@ -368,23 +365,18 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
                   );
                 })}
               </div>
-                    
-                    {/* Botão Carregar Mais (se houver mais tópicos) */}
-                    {sortedTopics.length > visibleTopicCount && (
-                      <div className="mt-4 text-center">
-                        <button
-                          onClick={() => setVisibleTopicCount(prevCount => 
-                            Math.min(prevCount + TOPIC_INCREMENT, sortedTopics.length)
-                          )}
-                          className="px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                        >
-                          Carregar Mais ({visibleTopicCount}/{sortedTopics.length})
-                        </button>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              
+              {/* Botão para carregar mais tópicos, se houver mais do que o visível */}
+              {todaysTopics.length > visibleTopicCount && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setVisibleTopicCount(prev => prev + TOPIC_INCREMENT)}
+                    className="text-primary-600 dark:text-primary-400 hover:underline text-sm font-medium"
+                  >
+                    Carregar Mais
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
