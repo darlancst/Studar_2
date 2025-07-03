@@ -243,9 +243,10 @@ export default function Pomodoro() {
       <div className="flex items-center justify-center space-x-4 w-full">
         <button 
           onClick={() => resetTimer(true)} 
-          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
-          title="Resetar e Salvar"
-          aria-label="Resetar timer e salvar progresso"
+          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          title="Resetar"
+          aria-label="Resetar timer"
+          disabled={!currentTopicId}
         >
           <FaRedo size={20}/>
         </button>
@@ -260,9 +261,10 @@ export default function Pomodoro() {
         </button>
         <button 
           onClick={() => skipToNext()} 
-          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+          className="p-4 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
           title="Pular"
           aria-label="Pular para o próximo estado"
+          disabled={!currentTopicId}
         >
           <FaForward size={20}/>
         </button>
