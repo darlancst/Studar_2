@@ -233,13 +233,14 @@ export default function Stats() {
     if (minutes < 60) {
       return `${minutes}m`;
     }
-    const hours = minutes / 60;
-    // Evita casas decimais desnecessárias (ex: 1.0h)
-    if (hours % 1 === 0) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+  
+    if (remainingMinutes === 0) {
       return `${hours}h`;
     }
-    // Formata com no máximo 1 casa decimal (ex: 1.5h)
-    return `${hours.toFixed(1)}h`.replace('.0', '');
+  
+    return `${hours}h${remainingMinutes}m`;
   };
   
   // Filtra as sessões Pomodoro pelo período
