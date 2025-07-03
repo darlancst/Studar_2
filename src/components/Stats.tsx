@@ -228,6 +228,20 @@ export default function Stats() {
     }
   };
   
+  // Formata o tempo para os eixos do gráfico (simplificado para 'h' ou 'm')
+  const formatTimeForAxis = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
+    const hours = minutes / 60;
+    // Evita casas decimais desnecessárias (ex: 1.0h)
+    if (hours % 1 === 0) {
+      return `${hours}h`;
+    }
+    // Formata com no máximo 1 casa decimal (ex: 1.5h)
+    return `${hours.toFixed(1)}h`.replace('.0', '');
+  };
+  
   // Filtra as sessões Pomodoro pelo período
   const getFilteredPomodoroSessions = (): PomodoroSession[] => {
     const { startDate, endDate } = calculateDateRange();
@@ -645,13 +659,26 @@ export default function Stats() {
     scales: {
           y: {
           beginAtZero: true,
-            title: {
-              display: true,
-              text: 'Minutos Estudados',
-              color: textColor,
+            ticks: {
+              color: isDarkMode ? '#cbd5e1' : '#4b5563',
+              font: {
+                family: 'Inter, sans-serif',
+              },
+              // Formata os ticks do eixo Y para mostrar horas/minutos
+              callback: function(value: string | number) {
+                if (typeof value === 'number') {
+                  return formatTimeForAxis(value);
+                }
+                return value;
+              }
             },
-            ticks: { color: textColor },
-            grid: { color: gridColor },
+            grid: {
+              color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+              drawBorder: false,
+            },
+            title: {
+              display: false, // O título já está no card
+            }
           },
           x: {
             ticks: { color: textColor },
