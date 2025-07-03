@@ -20,10 +20,11 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useReviewStore } from '@/store/reviewStore';
 import { useDatesStore } from '@/store/datesStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { format, subDays, startOfToday, endOfToday, isSameDay, parseISO, startOfDay, startOfWeek, endOfWeek, subYears, addDays, formatISO, endOfDay } from 'date-fns';
+import { format, subDays, startOfToday, endOfToday, isSameDay, parseISO, startOfDay, startOfWeek, endOfWeek, subYears, addDays, formatISO, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Subject, Review, PomodoroSession, Topic } from '@/types';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import { FaFire } from 'react-icons/fa';
 
 // Registrando os componentes necessários
 ChartJS.register(
@@ -297,6 +298,44 @@ export default function Stats() {
   // Conta as revisões completadas no período
   const countCompletedReviews = (): number => {
     return getFilteredReviews().filter(r => r.completed).length;
+  };
+
+  // Calcula a sequência de dias de estudo
+  const calculateStudyStreak = (): number => {
+    const dateStrings = getDates();
+    if (dateStrings.length === 0) {
+      return 0;
+    }
+
+    // 1. Garante datas únicas e as ordena da mais recente para a mais antiga
+    const uniqueDays = Array.from(new Set(dateStrings.map(d => d.split('T')[0])));
+    const sortedDates = uniqueDays.map(d => parseISO(d)).sort((a, b) => b.getTime() - a.getTime());
+
+    if (sortedDates.length === 0) {
+      return 0;
+    }
+
+    const today = startOfToday();
+    const mostRecentDay = sortedDates[0];
+
+    // 2. A sequência só é válida se o último estudo foi hoje ou ontem
+    if (differenceInCalendarDays(today, mostRecentDay) > 1) {
+      return 0;
+    }
+
+    let streak = 1;
+    // 3. Itera pelas datas para encontrar dias consecutivos
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const currentDay = sortedDates[i];
+      const previousDay = sortedDates[i + 1];
+      
+      if (differenceInCalendarDays(currentDay, previousDay) !== 1) {
+        break; // A sequência foi quebrada
+      }
+      streak++;
+    }
+
+    return streak;
   };
 
   // Obtém os dados do gráfico de pizza
@@ -749,50 +788,53 @@ export default function Stats() {
         </div>
       )}
       
-      {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Agrupador para layout mobile */}
-        <div className="sm:col-span-1 grid grid-cols-2 gap-4">
-          <div className="col-span-2 sm:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Total</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatStudyTime(calculateTotalStudyTime())}</p>
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 p-3 rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
+      {/* Cards de estatísticas com layout compacto para mobile (2x2) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Card: Tempo Total */}
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Total</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatStudyTime(calculateTotalStudyTime())}</p>
           </div>
-          <div className="col-span-2 sm:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{countCompletedReviews()}</p>
-            </div>
-            <div className="bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 p-3 rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-            </div>
+          <div className="text-blue-500 self-end">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
         
-        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+        {/* Card: Revisões Feitas */}
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Dias Estudados</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalDatesStudied}</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{countCompletedReviews()}</p>
           </div>
-          <div className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 p-3 rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          <div className="text-yellow-500 self-end">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
           </div>
         </div>
-        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+        
+        {/* Card: Dias em Sequência */}
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Dias em Sequência</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{calculateStudyStreak()}</p>
+          </div>
+          <div className="text-red-500 self-end">
+            <FaFire className="h-6 w-6" />
+          </div>
+        </div>
+        
+        {/* Card: Sessão Média */}
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Sessão Média</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{calculateAverageSessionTime()} min</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{calculateAverageSessionTime()} min</p>
           </div>
-          <div className="bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 p-3 rounded-full">
+          <div className="text-purple-500 self-end">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
       </div>
-      
+
       {/* Gráficos - com melhor responsividade */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Gráfico de pizza */}
