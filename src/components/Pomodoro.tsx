@@ -142,6 +142,8 @@ export default function Pomodoro() {
   const currentSubject = currentTopic ? subjects.find(s => s.id === currentTopic.subjectId) : null;
   const subjectColor = currentSubject?.color || '#a855f7';
 
+  const playPauseColor = isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+
   return (
     <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 max-w-md lg:max-w-lg mx-auto">
       <div className="w-full flex justify-between items-center mb-4">
@@ -252,8 +254,7 @@ export default function Pomodoro() {
         </button>
         <button
           onClick={handlePlayPause}
-          className="w-20 h-20 rounded-full text-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform"
-          style={{ backgroundColor: subjectColor }}
+          className={`w-20 h-20 rounded-full text-white flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform ${playPauseColor}`}
           disabled={!currentTopicId}
           aria-label={isRunning ? 'Pausar timer' : 'Iniciar timer'}
         >
