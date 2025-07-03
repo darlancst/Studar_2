@@ -633,7 +633,7 @@ export default function Stats() {
         plugins: {
           ...baseOptions.plugins,
           title: {
-            display: true,
+            display: false,
             text: `Progresso ${getChartPeriodTitle(period)}`,
             color: textColor,
             font: { size: 16, family: 'Inter, sans-serif' },
@@ -678,7 +678,7 @@ export default function Stats() {
       plugins: {
         ...baseOptions.plugins,
         title: {
-          display: true,
+          display: false,
           text: 'Distribuição do Tempo',
           color: textColor,
           font: { size: 16, family: 'Inter, sans-serif' },
@@ -843,19 +843,27 @@ export default function Stats() {
       {/* Gráficos - com melhor responsividade */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
         {/* Gráfico de Pizza */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-center h-96">
-          {pieChartData.labels.length > 0 ? (
-            <Pie data={pieChartData} options={getChartOptions('pie')} />
-          ) : (
-            <div className="flex items-center justify-center h-full">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col h-96">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
+            Distribuição do Tempo
+          </h3>
+          <div className="flex-grow flex items-center justify-center">
+            {pieChartData.labels.length > 0 ? (
+              <Pie data={pieChartData} options={getChartOptions('pie')} />
+            ) : (
               <p className="text-gray-500">Sem dados de estudo no período.</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         
         {/* Gráfico de Linha */}
-        <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md h-96">
-          <Line data={lineChartData} options={getChartOptions('line')} />
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col h-96">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
+            Progresso <span className="text-primary-500">{getChartPeriodTitle(period)}</span>
+          </h3>
+          <div className="flex-grow">
+            <Line data={lineChartData} options={getChartOptions('line')} />
+          </div>
         </div>
         
         {/* Heatmap de atividades - Agora com melhor responsividade */}
