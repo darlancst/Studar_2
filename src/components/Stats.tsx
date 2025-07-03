@@ -203,8 +203,8 @@ export default function Stats() {
   const getFilteredReviews = (): Review[] => {
     const { startDate, endDate } = calculateDateRange();
     return reviews.filter((review: Review) => {
-      const reviewDate = review.completed && review.date ? new Date(review.date) : new Date(review.scheduledDate);
-      return reviewDate >= startDate && reviewDate <= endDate;
+      const dateToCheck = review.completed && review.date ? new Date(review.date) : new Date(review.scheduledDate);
+      return dateToCheck >= startDate && dateToCheck <= endDate;
     });
   };
 
@@ -289,14 +289,25 @@ export default function Stats() {
   const calculateAverageSessionTime = (): number => {
     const filteredSessions = getFilteredPomodoroSessions();
     if (filteredSessions.length === 0) return 0;
-    const totalTime = filteredSessions.reduce((acc: number, session: PomodoroSession) => acc + session.duration, 0);
+    const totalTime = filteredSessions.reduce((acc: number, session) => acc + session.duration, 0);
     return Math.round(totalTime / filteredSessions.length);
   };
   
   // Conta as revisões completadas no período
   const countCompletedReviews = (): number => {
-    const filteredReviews = getFilteredReviews();
-    return filteredReviews.filter(review => review.completed).length;
+    return getFilteredReviews().filter(r => r.completed).length;
+  };
+
+  // Calcula o número de dias únicos de estudo no período
+  const countStudyDays = (): number => {
+    const filteredSessions = getFilteredPomodoroSessions();
+    if (filteredSessions.length === 0) return 0;
+
+    const studyDays = new Set<string>();
+    filteredSessions.forEach(session => {
+      studyDays.add(format(parseISO(session.date), 'yyyy-MM-dd'));
+    });
+    return studyDays.size;
   };
   
   // Prepara os dados para o gráfico de pizza - SIMPLIFICADO
@@ -335,24 +346,25 @@ export default function Stats() {
   
   // Prepara dados para gráfico de barras (Revisões Completadas vs. Pendentes)
   const getBarChartData = () => {
-    const filteredReviews = getFilteredReviews(); // Pega revisões filtradas pelo período
-    const completed = filteredReviews.filter(review => review.completed).length;
-    const pending = filteredReviews.filter(review => !review.completed).length;
+    const filteredReviews = getFilteredReviews();
+    const completed = filteredReviews.filter(r => r.completed).length;
+    const pending = filteredReviews.filter(r => !r.completed).length;
     
     return {
-      labels: ['Completadas', 'Pendentes'], // Labels para as barras
+      labels: ['Revisões'],
       datasets: [
         {
-          label: 'Número de Revisões', // Label geral do dataset
-          data: [completed, pending], // Dados: [contagem_completadas, contagem_pendentes]
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.6)', // Cor para completadas
-            'rgba(255, 159, 64, 0.6)' // Cor para pendentes
-          ],
-          borderColor: [
-            'rgb(75, 192, 192)',
-            'rgb(255, 159, 64)'
-          ],
+          label: 'Completadas',
+          data: [completed],
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Pendentes',
+          data: [pending],
+          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          borderColor: 'rgba(255, 99, 132, 1)',
           borderWidth: 1,
         },
       ],
@@ -774,7 +786,7 @@ export default function Stats() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center">
             <div>
               <h3 className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Dias Estudados</h3>
-              <p className="text-xl sm:text-2xl font-bold mt-1 dark:text-white">{totalDatesStudied}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-1 dark:text-white">{countStudyDays()}</p>
             </div>
             <div className="text-indigo-700 dark:text-indigo-300 mt-2 sm:mt-0">
               <span className="block text-xs">Último estudo:</span>
