@@ -730,7 +730,7 @@ export default function Stats() {
   };
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen p-4 sm:p-6">
+    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen">
       <div className="max-w-7xl mx-auto">
       {showConfetti && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
