@@ -53,12 +53,18 @@ export default function SubjectTopicManager({ onClose }: SubjectTopicManagerProp
   
   const { topics, addTopic, updateTopic, deleteTopic } = useTopicStore();
   
-  // Filtra tópicos para mostrar apenas os de hoje
+  // Filtra tópicos para mostrar apenas os de hoje, considerando o fuso horário local
   const todaysTopics = topics.filter(topic => {
+    // Converte a data de criação (que pode ser string ou Date) para um objeto Date
     const createdAtDate = typeof topic.createdAt === 'string' 
       ? parseISO(topic.createdAt) 
       : topic.createdAt;
-    return isSameDay(createdAtDate, new Date());
+      
+    // Força a data UTC a ser interpretada como se fosse local.
+    // Isso neutraliza o fuso horário para a comparação.
+    const localDate = new Date(createdAtDate.getUTCFullYear(), createdAtDate.getUTCMonth(), createdAtDate.getUTCDate());
+    
+    return isSameDay(localDate, new Date());
   });
 
   // Ordena as cores para colocar as indisponíveis no final
