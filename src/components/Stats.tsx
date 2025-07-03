@@ -846,7 +846,7 @@ export default function Stats() {
           {/* Gráfico de Pizza */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col h-96">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
-              Distribuição do Tempo
+              Distribuição do Tempo <span className="text-primary-500">{getChartPeriodTitle(period)}</span>
             </h3>
             <div className="flex-grow flex items-center justify-center">
               {pieChartData.labels.length > 0 ? (
