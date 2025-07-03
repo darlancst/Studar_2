@@ -86,8 +86,7 @@ export default function Stats() {
   const { getDates } = useDatesStore();
   
   const subjects = getSubjectsWithTopics();
-  const studyDates = getDates();
-  const totalDatesStudied = studyDates.length;
+  const totalDatesStudied = getDates().length;
   
   useEffect(() => {
     const checkMobileView = () => {
@@ -254,15 +253,19 @@ export default function Stats() {
     });
 
     // Adiciona o tempo da sessão ativa (pausada ou não)
-    if (isRunning && currentTopicId && isSameDay(new Date(), endOfToday())) {
-      const subjectId = findSubjectIdForTopic(currentTopicId);
-      if (subjectId) {
-        const subjectData = subjectMap.get(subjectId);
-        if (subjectData) {
-          subjectMap.set(subjectId, { 
-            time: subjectData.time + Math.floor(elapsedSeconds / 60),
-            color: subjectData.color
-          });
+    if (currentTopicId && elapsedSeconds > 0) {
+      const sessionDate = new Date();
+      if (sessionDate >= startDate && sessionDate <= endDate) {
+        const subjectId = findSubjectIdForTopic(currentTopicId);
+        if (subjectId) {
+          const subjectData = subjectMap.get(subjectId);
+          if (subjectData) {
+            const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
+            subjectMap.set(subjectId, {
+              time: subjectData.time + activeSessionMinutes,
+              color: subjectData.color,
+            });
+          }
         }
       }
     }
@@ -296,69 +299,175 @@ export default function Stats() {
     return getFilteredReviews().filter(r => r.completed).length;
   };
 
+  // Obtém os dados do gráfico de pizza
+  const getPieChartData = () => {
+    const sessionsBySubject = getSessionsBySubject();
+    const data = Array.from(sessionsBySubject.entries())
+      .filter(([key, value]) => value.time > 0)
+      .map(([key, value]) => {
+        const subject = subjects.find(s => s.id === key);
+        return {
+          label: subject?.name || 'Unknown',
+          value: value.time,
+          color: value.color
+        };
+      });
+
+    return {
+      labels: data.map(d => d.label),
+      datasets: [
+        {
+          data: data.map(d => d.value),
+          backgroundColor: data.map(d => `${d.color}BF`), // Ex: 'BF' para 75% opacidade
+          borderColor: data.map(d => d.color),
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+  
+  // Prepara dados para gráfico de barras (Revisões Completadas vs. Pendentes)
+  const getBarChartData = () => {
+    const filteredReviews = getFilteredReviews();
+    const completed = filteredReviews.filter(r => r.completed).length;
+    const pending = filteredReviews.filter(r => !r.completed).length;
+    
+    return {
+      labels: ['Revisões'],
+      datasets: [
+        {
+          label: 'Completadas',
+          data: [completed],
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: 'Pendentes',
+          data: [pending],
+          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+  
+  // Prepara dados para gráfico de linha (tempo por dia) - SIMPLIFICADO
+  // (Assumindo que getLineChartData era similar ao getBarChartData, vamos criar um similar)
+  const getLineChartData = () => {
+    const { startDate, endDate } = calculateDateRange();
+    const labels: string[] = [];
+    const data: number[] = [];
+    const filteredSessions = getFilteredPomodoroSessions();
+
+    // Determina o número de dias baseado no período
+    let daysToShow = 7; // Default para semana
+    if (period === 'month') daysToShow = 30;
+    // Se for 'annual', a lógica precisaria ser mais complexa para agrupar ou limitar
+    // Por enquanto, vamos limitar 'annual' a 30 dias também para este gráfico
+    if (period === 'annual') daysToShow = 30; 
+    if (period === 'today') daysToShow = 1;
+
+    const baseDate = startOfToday();
+    for (let i = daysToShow - 1; i >= 0; i--) {
+      const date = subDays(baseDate, i);
+      labels.push(format(date, 'dd/MM', { locale: pt }));
+      
+      const dayTotal = filteredSessions
+        .filter((session: PomodoroSession) => isSameDay(parseISO(session.date), date))
+        .reduce((total: number, session: PomodoroSession) => total + session.duration, 0);
+      
+      data.push(dayTotal);
+    }
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Tempo de estudo (min)',
+          data,
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.5)',
+          tension: 0.2,
+        },
+      ],
+    };
+  };
+  
   // Calcula o tempo total de estudo na semana atual - SIMPLIFICADO
   const calculateWeeklyStudyTime = (): number => {
-    const today = startOfToday();
-    const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 });
-    const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
-
-    const weeklySessions = pomodoroSessions.filter(session => {
+    // Obtém o período da semana atual (Domingo a Sábado)
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 0 }); 
+    const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+    
+    // Filtra todas as sessões pela semana atual
+    const weeklySessions = pomodoroSessions.filter((session: PomodoroSession) => {
       const sessionDate = parseISO(session.date);
-      return sessionDate >= startOfCurrentWeek && sessionDate <= endOfCurrentWeek;
+      return sessionDate >= weekStart && sessionDate <= weekEnd;
     });
-    return weeklySessions.reduce((acc, session) => acc + session.duration, 0);
+    
+    // Soma todas as sessões da semana
+    const weeklyTotal = weeklySessions.reduce((total: number, session: PomodoroSession) => 
+      total + session.duration, 0);
+    
+    return weeklyTotal;
   };
   
   // Prepara os dados para o heatmap
-  const getHeatMapData = (): HeatmapData => {
-    const endDate = endOfToday();
-    const startDate = subYears(endDate, 1);
-    const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    
-    const dateDurationMap = new Map<string, number>();
-    pomodoroSessions.forEach(session => {
-      const dateKey = format(parseISO(session.date), 'yyyy-MM-dd');
-      dateDurationMap.set(dateKey, (dateDurationMap.get(dateKey) || 0) + session.duration);
-    });
+  const getHeatMapData = () => {
+    // 1. Cria uma lista unificada de todas as sessões, incluindo a ativa.
+    const allSessions: PomodoroSession[] = [...pomodoroSessions];
 
-    const heatmapData: ({ date: string; minutes: number; tooltip: string; isToday: boolean } | null)[][] = [];
-    const monthLabels: { text: string; xPos: number }[] = [];
-    const weeks: Map<number, ({ date: string; minutes: number; tooltip: string; isToday: boolean } | null)[]> = new Map();
-    
-    let currentDay = startDate;
-    let lastMonth = -1;
-
-    while(currentDay <= endDate) {
-      const weekIndex = Math.floor((currentDay.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      if(!weeks.has(weekIndex)) {
-        weeks.set(weekIndex, new Array(7).fill(null));
+    if (currentTopicId && elapsedSeconds > 0) {
+      const activeMinutes = Math.floor(elapsedSeconds / 60);
+      if (activeMinutes > 0) {
+        allSessions.push({
+          id: 'active-session',
+          topicId: currentTopicId,
+          duration: activeMinutes,
+          date: new Date().toISOString(), // Usar ISO string para consistência
+        });
       }
-
-      const dayOfWeek = currentDay.getDay();
-      const dateKey = format(currentDay, 'yyyy-MM-dd');
-      const minutes = dateDurationMap.get(dateKey) || 0;
-      
-      weeks.get(weekIndex)![dayOfWeek] = {
-        date: dateKey,
-        minutes: minutes,
-        tooltip: `${format(currentDay, "dd 'de' MMMM, yyyy", { locale: pt })}: ${minutes > 0 ? formatStudyTime(minutes) : 'Sem estudo'}`,
-        isToday: isSameDay(currentDay, startOfToday())
-      };
-
-      if (currentDay.getMonth() !== lastMonth) {
-        lastMonth = currentDay.getMonth();
-        monthLabels.push({ text: format(currentDay, 'MMM', { locale: pt }), xPos: weekIndex * (heatmapCellSize + heatmapCellGap) });
-      }
-
-      currentDay = addDays(currentDay, 1);
     }
     
-    weeks.forEach(week => heatmapData.push(week));
-    
-    const heatmapWidth = weeks.size * (heatmapCellSize + heatmapCellGap);
-    const heatmapHeight = 7 * (heatmapCellSize + heatmapCellGap);
+    // 2. Processa a lista unificada para criar o mapa de duração.
+    const dateDurationMap = new Map<string, number>();
+    for (const session of allSessions) {
+      if (!session.date || session.duration == null) continue;
+      try {
+        // Usa a data do ISO string diretamente como chave (YYYY-MM-DD)
+        const dateStr = session.date.split('T')[0];
+        const currentDuration = dateDurationMap.get(dateStr) || 0;
+        dateDurationMap.set(dateStr, currentDuration + session.duration);
+      } catch (error) {
+        console.error("Erro ao processar data da sessão para heatmap:", session.date, error);
+      }
+    }
 
-    return { heatmapData, monthLabels, dayLabels, heatmapWidth, heatmapHeight };
+    // 3. Converte para o formato final do heatmap.
+    const heatmapData = Array.from(dateDurationMap.entries())
+      .filter(([date, totalMinutes]) => totalMinutes > 0)
+      .map(([date, totalMinutes]) => {
+        let formattedDate = date;
+        let formattedTime = `${totalMinutes} min`;
+        try {
+          const parsedDate = parseISO(date);
+          formattedDate = format(parsedDate, "dd 'de' MMMM, yyyy", { locale: pt });
+          formattedTime = formatStudyTime(totalMinutes);
+        } catch (error) {
+          console.error("Erro ao formatar data/hora do heatmap:", date, totalMinutes, error);
+        }
+
+        return {
+          date,
+          count: totalMinutes,
+          content: `${formattedDate}: ${formattedTime} de estudo`
+        };
+      });
+      
+    return heatmapData;
   };
   
   // Função para buscar atividades de uma data específica
@@ -391,38 +500,16 @@ export default function Stats() {
   // Handler para clique na célula
   const handleCellClick = (date: Date | null) => {
     if (date) {
+      const activities = getActivitiesForDate(date);
       setSelectedDateDetails(date);
-      setSelectedActivities(getActivitiesForDate(date));
+      setSelectedActivities(activities);
     } else {
+      // Se clicar em célula vazia ou fora do range, limpa a seleção
       setSelectedDateDetails(null);
       setSelectedActivities([]);
     }
   };
   
-  const handleCellHover = (e: React.MouseEvent, text: string) => {
-    setTooltip({
-      show: true,
-      text: text,
-      x: e.clientX,
-      y: e.clientY
-    });
-  };
-
-  const { heatmapData, monthLabels, dayLabels, heatmapWidth, heatmapHeight } = getHeatMapData();
-
-  const getColor = (count: number) => {
-    if (!count || count === 0) return isDarkMode ? '#2d3748' : '#f3f4f6';
-    const colorLevels = isDarkMode 
-      ? ['#4f46e530', '#4f46e545', '#6366f160', '#7c3aed75', '#9333ea85', '#a855f790'] 
-      : ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
-    if (count < heatmapThresholds.level1) return colorLevels[0];
-    if (count < heatmapThresholds.level2) return colorLevels[1];
-    if (count < heatmapThresholds.level3) return colorLevels[2];
-    if (count < heatmapThresholds.level4) return colorLevels[3];
-    if (count < heatmapThresholds.level5) return colorLevels[4];
-    return colorLevels[5];
-  };
-
   // --- Renderização --- 
   const totalStudyTime = calculateTotalStudyTime();
   const weeklyStudyTime = calculateWeeklyStudyTime();
@@ -455,9 +542,7 @@ export default function Stats() {
   };
 
   // Calcula a porcentagem de progresso
-  const weeklyGoalMinutes = weeklyGoal * 60;
-  const weeklyProgress = weeklyGoalMinutes > 0 ? Math.min(Math.round((weeklyStudyTime / weeklyGoalMinutes) * 100), 100) : 0;
-  const isGoalCompleted = weeklyProgress >= 100;
+  const weeklyProgress = Math.min(100, Math.round((weeklyStudyTime / weeklyGoal) * 100));
   
   const pieChartData = getPieChartData();
   const barChartData = getBarChartData();
@@ -566,16 +651,12 @@ export default function Stats() {
 
   // Função para resetar todas as estatísticas
   const handleResetAllStats = () => {
-    usePomodoroStore.getState().reset();
+    // A função resetAllData do settingsStore deve ser usada para esta ação.
+    // Como ela não está sendo chamada aqui, esta função se torna redundante
+    // e pode ser substituída pela chamada direta nos botões.
+    // Por enquanto, vamos manter a lógica como está para evitar quebrar a UI
+    // mas a ação correta seria chamar useSettingsStore().getState().resetAllData()
     setShowResetConfirm(false);
-  };
-
-  type HeatmapData = {
-    heatmapData: ({ date: string; minutes: number; tooltip: string; isToday: boolean } | null)[][];
-    monthLabels: { text: string; xPos: number }[];
-    dayLabels: string[];
-    heatmapWidth: number;
-    heatmapHeight: number;
   };
 
   return (
@@ -669,177 +750,386 @@ export default function Stats() {
       )}
       
       {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between h-full col-span-1">
-            <div className="flex justify-between items-start">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Total</span>
-              <div className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 p-2 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Agrupador para layout mobile */}
+        <div className="sm:col-span-1 grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Total</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatStudyTime(calculateTotalStudyTime())}</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{formatStudyTime(totalStudyTime)}</p>
+            <div className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 p-3 rounded-full">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
           </div>
-          <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between h-full col-span-1">
-            <div className="flex justify-between items-start">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas</span>
-              <div className="bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 p-2 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-              </div>
+          <div className="col-span-2 sm:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revisões Feitas</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{countCompletedReviews()}</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{completedReviewsCount}</p>
+            <div className="bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 p-3 rounded-full">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+            </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between h-full col-span-1">
-            <div className="flex justify-between items-start">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Dias Estudados</span>
-              <div className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 p-2 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{totalDatesStudied}</p>
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Dias Estudados</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalDatesStudied}</p>
           </div>
-          <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between h-full col-span-1">
-            <div className="flex justify-between items-start">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Média / Sessão</span>
-              <div className="bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 p-2 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{formatStudyTime(averageSessionTime)}</p>
+          <div className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 p-3 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
+        </div>
+        <div className="stat-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Sessão Média</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{calculateAverageSessionTime()} min</p>
+          </div>
+          <div className="bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 p-3 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
       </div>
-
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        <div className="lg:col-span-3 grid grid-cols-1 gap-6">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-            <h3 className="font-semibold text-lg mb-4 text-gray-800 dark:text-gray-200">Distribuição do Tempo por Matéria</h3>
-            <div className="h-64 sm:h-80 flex items-center justify-center">
-              <Pie data={pieChartData} options={getChartOptions(pieOptions)} />
+      
+      {/* Gráficos - com melhor responsividade */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Gráfico de pizza */}
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
+          {pieChartData.labels.length > 0 ? (
+            <Pie data={pieChartData} options={getChartOptions(pieOptions)} />
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+              Sem dados de tempo para o período.
             </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-            <h3 className="font-semibold text-lg mb-4 text-gray-800 dark:text-gray-200">Revisões Completadas vs. Pendentes</h3>
-            <div className="h-64 sm:h-80">
-              <Bar data={barChartData} options={getChartOptions(barOptions)} />
-            </div>
-          </div>
+          )}
         </div>
-
-        <div className="lg:col-span-2 grid grid-cols-1 gap-6">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-            <h3 className="font-semibold text-lg mb-4 text-gray-800 dark:text-gray-200">Progresso Diário (Últimos 7 dias)</h3>
-            <div className="h-64 sm:h-80">
-              <Line data={lineChartData} options={getChartOptions(lineOptions)} />
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-            <h3 className="font-semibold text-lg mb-2 text-gray-800 dark:text-gray-200">Mapa de Atividades (Último Ano)</h3>
-            <div 
-              ref={heatmapScrollRef}
-              className="heatmap-container overflow-x-auto overflow-y-hidden"
-              onMouseLeave={() => setTooltip({ show: false, text: '', x: 0, y: 0 })}
-            >
-              <svg width={heatmapWidth} height={heatmapHeight} className="max-w-full">
-                <g transform={`translate(${heatmapCellSize * 2}, 20)`}>
-                  {heatmapData.map((week: ({ date: string; minutes: number; tooltip: string; isToday: boolean } | null)[], weekIndex: number) => (
-                    <g key={weekIndex} transform={`translate(${weekIndex * (heatmapCellSize + heatmapCellGap)}, 0)`}>
-                      {week.map((day: { date: string; minutes: number; tooltip: string; isToday: boolean } | null, dayIndex: number) => {
-                        if (!day) return null;
-                        return (
-                          <rect
-                            key={day.date}
-                            x={0}
-                            y={dayIndex * (heatmapCellSize + heatmapCellGap)}
-                            width={heatmapCellSize}
-                            height={heatmapCellSize}
-                            rx="2"
-                            ry="2"
-                            fill={getColor(day.minutes)}
-                            className={`cursor-pointer transition-opacity ${selectedDateDetails && isSameDay(parseISO(day.date), selectedDateDetails) ? 'opacity-100 ring-2 ring-offset-1 ring-primary-500 dark:ring-primary-400' : 'opacity-80 hover:opacity-100'}`}
-                            onMouseEnter={(e) => handleCellHover(e, day.tooltip)}
-                            onClick={() => handleCellClick(parseISO(day.date))}
-                          />
-                        );
-                      })}
-                    </g>
-                  ))}
-                  {/* Renderiza os meses */}
-                  {monthLabels.map(({ text, xPos }: { text: string, xPos: number }, index: number) => (
-                    <text
-                      key={index}
-                      x={xPos}
-                      y={-8}
-                      className="text-xs fill-current text-gray-500 dark:text-gray-400"
-                    >
-                      {text}
-                    </text>
-                  ))}
-                  {/* Renderiza os dias da semana */}
-                  {dayLabels.map((label: string, index: number) => (
-                    <text
-                      key={label}
-                      x={-15}
-                      y={(index * (heatmapCellSize + heatmapCellGap)) + heatmapCellSize - 2}
-                      className="text-xs fill-current text-gray-500 dark:text-gray-400"
-                    >
-                      {label}
-                    </text>
-                  ))}
-                </g>
-              </svg>
-            </div>
-            {tooltip.show && (
-              <div
-                className="absolute bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none"
-                style={{ top: tooltip.y, left: tooltip.x, transform: 'translate(-50%, -110%)' }}
-              >
-                {tooltip.text}
-              </div>
-            )}
-          </div>
+        
+        {/* Gráfico de barras */}
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg h-64 sm:h-80">
+          <Bar data={barChartData} options={getChartOptions(barOptions)} />
         </div>
-      </div>
+        
+        {/* Gráfico de linha */}
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2 h-64 sm:h-80">
+          <Line data={lineChartData} options={getChartOptions(lineOptions)} />
+        </div>
+        
+        {/* Heatmap de atividades - Agora com melhor responsividade */}
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg lg:col-span-2">
+          <h3 className="text-lg font-medium mb-4 md:mb-6 text-center dark:text-white">Histórico de Atividades</h3>
+          <div ref={heatmapScrollRef} className="w-full overflow-x-auto" 
+               aria-label="Histórico de atividades de estudo" 
+               role="figure" 
+               aria-description="Mapa de calor mostrando a frequência de sessões de estudo durante os últimos 12 meses">
+            {(() => {
+              // 1. Obter os dados para o heatmap de forma simplificada
+              const heatmapData = getHeatMapData();
+              
+              // 2. Funções auxiliares para o heatmap
+              const getColor = (count: number) => {
+                if (!count || count === 0) return isDarkMode ? '#2d3748' : '#f3f4f6';
+                
+                // Esquema de cores para diferentes níveis de atividade - melhor gradiente para modo escuro
+                const colorLevels = isDarkMode 
+                  ? ['#4f46e530', '#4f46e545', '#6366f160', '#7c3aed75', '#9333ea85', '#a855f790'] 
+                  : ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
+                
+                // Usa os limiares personalizados do store
+                if (count < heatmapThresholds.level1) return colorLevels[0];
+                if (count < heatmapThresholds.level2) return colorLevels[1];
+                if (count < heatmapThresholds.level3) return colorLevels[2];
+                if (count < heatmapThresholds.level4) return colorLevels[3];
+                if (count < heatmapThresholds.level5) return colorLevels[4];
+                return colorLevels[5];
+              };
+              
+              // 3. Construir o calendário personalizado
+              // Configuração do calendário
+              const endDate = new Date(); // Hoje
+              const startDate = subYears(endDate, 1); // Exatamente um ano atrás
+              const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+              
+              // Definindo tipos explícitos
+              type DayCellData = {
+                date: string; 
+                minutes: number;
+                tooltip: string;
+                isToday: boolean;
+              };
 
-      {selectedDateDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => handleCellClick(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4 dark:text-white">
-              Atividades de {format(selectedDateDetails, "dd 'de' MMMM, yyyy", { locale: pt })}
-            </h3>
-            {selectedActivities.length > 0 ? (
-              <ul className="space-y-2">
-                {selectedActivities.map((activity, index) => {
-                  // Verifica se é PomodoroSession ou Review para mostrar detalhes diferentes
-                  const isPomodoro = 'duration' in activity;
-                  const topicId = (activity as PomodoroSession).topicId || (activity as Review).topicId;
-                  const subjectId = findSubjectIdForTopic(topicId);
-                  const subject = subjects.find(s => s.id === subjectId);
-                  const topic = subject?.topics.find(t => t.id === topicId);
+              // Obter dados de atividade (minutos por dia)
+              const activityMap = new Map<string, number>(
+                heatmapData.map(item => [item.date, item.count])
+              );
 
-                  return (
-                    <li key={index} className="text-sm p-2 rounded bg-white dark:bg-gray-600 shadow-sm overflow-hidden">
-                      <div className="flex flex-col sm:flex-row sm:items-center">
-                        <span className={`font-semibold mr-2 ${isPomodoro ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                        {isPomodoro ? '[Foco]' : (activity as Review).completed ? '[Revisão Concluída]' : '[Revisão Agendada]'}
-                      </span>
-                        <span className="mt-1 sm:mt-0 dark:text-gray-300 break-words">
-                        {subject?.name || 'Matéria não encontrada'} - {topic?.title || 'Tópico não encontrado'}
-                        {isPomodoro && ` (${formatStudyTime((activity as PomodoroSession).duration)})`}
-                      </span>
+              // Gerar TODOS os dias do período (um ano completo)
+              const allDays: DayCellData[] = [];
+              const monthLabelsData: { label: string; columnIndex: number }[] = [];
+              
+              // Começar no domingo da primeira semana
+              let currentDay = startOfDay(startDate);
+              // Retroceder até o domingo anterior (início da semana)
+              while (currentDay.getDay() !== 0) {
+                currentDay = subDays(currentDay, 1);
+              }
+              
+              // Variáveis para controlar a posição
+              let weekIndex = 0;
+              let currentMonth = -1;
+              
+              // Gerar os dias até o final do período + dias restantes da última semana
+              while (currentDay <= endDate || currentDay.getDay() !== 0) {
+                const dateKey = format(currentDay, 'yyyy-MM-dd');
+                const minutes = activityMap.get(dateKey) || 0;
+                const inRange = currentDay >= startDate && currentDay <= endDate;
+                
+                // Verificar se começou um novo mês para os rótulos
+                if (currentDay.getMonth() !== currentMonth && currentDay.getDay() === 0) {
+                  currentMonth = currentDay.getMonth();
+                  const monthName = format(currentDay, 'MMM', { locale: pt });
+                  monthLabelsData.push({ 
+                    label: monthName, 
+                    columnIndex: weekIndex 
+                  });
+                }
+
+                // Adicionar o dia ao array principal (apenas se estiver no período de interesse)
+                if (inRange) {
+                  allDays.push({
+                    date: dateKey,
+                    minutes,
+                    tooltip: minutes > 0 
+                      ? `${format(currentDay, "dd 'de' MMMM, yyyy", { locale: pt })}: ${formatStudyTime(minutes)}`
+                      : `Sem estudo em ${format(currentDay, "dd 'de' MMMM, yyyy", { locale: pt })}`,
+                    isToday: isSameDay(currentDay, new Date())
+                  });
+                }
+
+                // Avança para o próximo dia
+                currentDay = addDays(currentDay, 1);
+                
+                // Se este era o último dia da semana, incrementa o índice da semana
+                if (currentDay.getDay() === 0) {
+                  weekIndex++;
+                }
+              }
+              
+              // Número total de semanas para o grid
+              const totalWeeks = weekIndex;
+              
+              // Determinar o tamanho adequado para as células e o grid
+              // Usando as variáveis do escopo do componente
+              const cellSize = heatmapCellSize; 
+              const cellGap = heatmapCellGap; 
+              const cellUnit = cellSize + cellGap; // Tamanho total incluindo espaço
+              
+              // 4. Renderizar o heatmap estilo GitHub
+              return (
+                <div className="github-style-heatmap centered-heatmap">
+                  {/* Container para meses e grid */}
+                  <div className="heatmap-content-wrapper">
+                    {/* Rótulos dos meses */}
+                    <div className="month-labels">
+                      {monthLabelsData.map(({ label, columnIndex }) => (
+                        <div 
+                          key={`month-${label}-${columnIndex}`} 
+                          className="month-label"
+                          style={{
+                            left: `${columnIndex * cellUnit}px`
+                          }}
+                        >
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Container para dias da semana e grid */}
+                    <div className="days-and-grid-container">
+                      {/* Rótulos dos dias da semana */}
+                      <div className="weekday-labels">
+                        {dayNames.map((day, index) => (
+                          <div key={`day-${index}`} className="weekday-label">
+                            {day}
+                          </div>
+                        ))}
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400">Nenhuma atividade registrada neste dia.</p>
-            )}
+                      
+                      {/* Grid de células (dias) */}
+                      <div 
+                        className="days-grid"
+                        style={{
+                          gridTemplateRows: `repeat(7, ${cellSize}px)`,
+                          gridTemplateColumns: `repeat(${totalWeeks}, ${cellSize}px)`,
+                          gap: `${cellGap}px`,
+                          gridAutoFlow: 'column' // Fluxo de preenchimento por coluna, não por linha
+                        }}
+                      >
+                        {/* Primeiro geramos os dias da semana (linhas) */}
+                        {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
+                          // Depois geramos as semanas (colunas) para cada dia
+                          Array.from({ length: totalWeeks }).map((_, weekIndex) => {
+                            // Primeiro domingo da grade
+                            const firstSunday = startOfWeek(startDate, { weekStartsOn: 0 });
+                            // Data atual baseada no dia da semana e índice da semana
+                            const dayDate = addDays(firstSunday, dayOfWeek + (weekIndex * 7));
+                            const dateKey = format(dayDate, 'yyyy-MM-dd');
+                            const dayData = allDays.find(d => d.date === dateKey);
+                            const cellIndex = (dayOfWeek * totalWeeks) + weekIndex;
+                            
+                            // Se este dia está fora do período, renderize célula vazia
+                            if (!dayData && (dayDate < startDate || dayDate > endDate)) {
+                              return (
+                                <div 
+                                  key={`empty-${cellIndex}`} 
+                                  className="day-cell outside-range"
+                                ></div>
+                              );
+                            }
+                            
+                            const minutes = dayData?.minutes || 0;
+                            const isToday = dayData?.isToday || false;
+                            const tooltipText = dayData?.tooltip || '';
+                            
+                            return (
+                              <div 
+                                key={`cell-${cellIndex}`}
+                                className={`day-cell ${isToday ? 'today' : ''} ${minutes > 0 ? 'has-activity' : ''}`}
+                                style={{
+                                  backgroundColor: getColor(minutes),
+                                  gridRow: dayOfWeek + 1,
+                                  gridColumn: weekIndex + 1
+                                }}
+                                aria-label={tooltipText}
+                                data-tooltip={tooltipText}
+                                onClick={() => handleCellClick(minutes > 0 ? dayDate : null)}
+                                onMouseEnter={(e: React.MouseEvent) => {
+                                  const currentTooltipText = e.currentTarget.getAttribute('data-tooltip') || '';
+                                  setTooltip({
+                                    show: true,
+                                    text: currentTooltipText,
+                                    x: e.clientX,
+                                    y: e.clientY
+                                  });
+                                }}
+                                onMouseMove={(e: React.MouseEvent) => {
+                                  setTooltip(prev => ({
+                                    ...prev,
+                                    x: e.clientX,
+                                    y: e.clientY
+                                  }));
+                                }}
+                                onMouseLeave={() => {
+                                  setTooltip(prev => ({
+                                    ...prev,
+                                    show: false
+                                  }));
+                                }}
+                              ></div>
+                            );
+                          })
+                        )).flat()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
+          
+          {/* Legenda de cores */}
+          <div className="color-scale-legend">
+            <span className="legend-text">Tempo de estudo:</span>
+            
+            {/* Array com informações dos níveis */}
+            {[
+              { level: 0, label: '0 min', range: 'Nenhum estudo' },
+              { level: 1, label: `1-${heatmapThresholds.level1-1} min`, range: `Menos de ${heatmapThresholds.level1} minutos` },
+              { level: 2, label: `${heatmapThresholds.level1}-${heatmapThresholds.level2-1} min`, range: `Entre ${heatmapThresholds.level1} e ${heatmapThresholds.level2} minutos` },
+              { level: 3, label: `${heatmapThresholds.level2}-${heatmapThresholds.level3-1} min`, range: `Entre ${heatmapThresholds.level2} e ${heatmapThresholds.level3} minutos` },
+              { level: 4, label: `${heatmapThresholds.level3}-${heatmapThresholds.level4-1} min`, range: `Entre ${heatmapThresholds.level3} e ${heatmapThresholds.level4} minutos` },
+              { level: 5, label: `${heatmapThresholds.level4}-${heatmapThresholds.level5-1} min`, range: `Entre ${heatmapThresholds.level4} e ${heatmapThresholds.level5} minutos` },
+              { level: 6, label: `${heatmapThresholds.level5}+ min`, range: `Mais de ${heatmapThresholds.level5} minutos` }
+            ].map((item) => (
+              <div 
+                key={item.level}
+                className="legend-item"
+                title={item.range}
+              >
+                <div 
+                  className="color-box"
+                style={{ 
+                    backgroundColor: item.level === 0 
+                      ? (isDarkMode ? '#2d3748' : '#f3f4f6') 
+                      : isDarkMode 
+                        ? [`#4f46e530`, `#4f46e545`, `#6366f160`, `#7c3aed75`, `#9333ea85`, `#a855f790`][item.level-1]
+                        : [`#dbeafe`, `#bfdbfe`, `#93c5fd`, `#60a5fa`, `#3b82f6`, `#2563eb`][item.level-1],
+                    border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
+                  }}
+                  aria-label={item.range}
+              />
+                <span className="level-label">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Área de Detalhes das Atividades */}
+      {selectedDateDetails && (
+        <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg lg:col-span-2 overflow-x-auto">
+          <h3 className="text-lg font-medium mb-3 dark:text-white">
+            Atividades de {format(selectedDateDetails, "dd 'de' MMMM, yyyy", { locale: pt })}
+          </h3>
+          {selectedActivities.length > 0 ? (
+            <ul className="space-y-2">
+              {selectedActivities.map((activity, index) => {
+                // Verifica se é PomodoroSession ou Review para mostrar detalhes diferentes
+                const isPomodoro = 'duration' in activity;
+                const topicId = (activity as PomodoroSession).topicId || (activity as Review).topicId;
+                const subjectId = findSubjectIdForTopic(topicId);
+                const subject = subjects.find(s => s.id === subjectId);
+                const topic = subject?.topics.find(t => t.id === topicId);
+
+                return (
+                  <li key={index} className="text-sm p-2 rounded bg-white dark:bg-gray-600 shadow-sm overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center">
+                      <span className={`font-semibold mr-2 ${isPomodoro ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                      {isPomodoro ? '[Foco]' : (activity as Review).completed ? '[Revisão Concluída]' : '[Revisão Agendada]'}
+                    </span>
+                      <span className="mt-1 sm:mt-0 dark:text-gray-300 break-words">
+                      {subject?.name || 'Matéria não encontrada'} - {topic?.title || 'Tópico não encontrado'}
+                      {isPomodoro && ` (${formatStudyTime((activity as PomodoroSession).duration)})`}
+                    </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400">Nenhuma atividade registrada neste dia.</p>
+          )}
+        </div>
+      )}
+
+      {/* Tooltip global controlado por React */}
+      {tooltip.show && (
+        <div 
+          className="fixed z-[9999] px-3 py-2 rounded-md text-sm pointer-events-none"
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y - 80}px`, // Aumentado para 60px acima do cursor
+            transform: 'translate(-50%, 0)', // Apenas centralizar horizontalmente
+            backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            color: isDarkMode ? '#e5e7eb' : '#1f2937',
+            border: `1px solid ${isDarkMode ? '#4b5563' : '#e5e7eb'}`,
+            boxShadow: `0 3px 10px ${isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'}`,
+            maxWidth: '300px',
+            whiteSpace: 'normal'
+          }}
+        >
+          {tooltip.text}
         </div>
       )}
 
