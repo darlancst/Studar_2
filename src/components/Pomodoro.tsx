@@ -33,6 +33,7 @@ export default function Pomodoro() {
     isRunning,
     completedPomodoros,
     elapsedSeconds,
+    lastPomodoroDate,
   } = usePomodoroStore();
 
   const {
@@ -43,6 +44,12 @@ export default function Pomodoro() {
   } = usePomodoroStore.getState();
 
   useEffect(() => {
+    // Adicionado para resetar a contagem de pomodoros a cada novo dia
+    if (completedPomodoros > 0 && lastPomodoroDate) {
+      if (!isSameDay(new Date(lastPomodoroDate), new Date())) {
+        usePomodoroStore.setState({ completedPomodoros: 0, lastPomodoroDate: null });
+      }
+    }
     fetchTopics();
   }, [fetchTopics]);
   

@@ -4,6 +4,7 @@ import { PomodoroSession, PomodoroState } from '@/types';
 import { useDatesStore } from './datesStore';
 import { createClient } from '@/lib/supabase/client';
 import { useSettingsStore } from './settingsStore';
+import { isSameDay } from 'date-fns';
 
 const supabase = createClient();
 
@@ -14,6 +15,7 @@ interface PomodoroStore {
   currentTopicId: string | null;
   timeRemaining: number; // em segundos
   completedPomodoros: number;
+  lastPomodoroDate: string | null;
   elapsedSeconds: number; // segundos decorridos na sessão atual
   
   // Sessões (do Pomodoro, não do estudo geral)
@@ -42,6 +44,7 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   currentTopicId: null,
   timeRemaining: useSettingsStore.getState().settings.pomodoro.focusDuration * 60,
   completedPomodoros: 0,
+  lastPomodoroDate: null,
   elapsedSeconds: 0,
   
   sessions: [],
@@ -105,14 +108,21 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
 
   _advanceState: () => {
-    const { currentState, completedPomodoros } = get();
+    const { currentState, completedPomodoros, lastPomodoroDate } = get();
     const { settings } = useSettingsStore.getState();
+    const update: Partial<PomodoroStore> = {};
     let nextState: PomodoroState;
     let nextTimeRemaining: number;
 
     if (currentState === 'focus') {
-      const newCompleted = completedPomodoros + 1;
-      set({ completedPomodoros: newCompleted });
+      const today = new Date();
+      const lastDate = lastPomodoroDate ? new Date(lastPomodoroDate) : null;
+      
+      const isToday = lastDate && isSameDay(today, lastDate);
+      
+      const newCompleted = isToday ? completedPomodoros + 1 : 1;
+      update.completedPomodoros = newCompleted;
+      update.lastPomodoroDate = today.toISOString();
 
       if (newCompleted % settings.pomodoro.longBreakInterval === 0) {
         nextState = 'longBreak';
@@ -126,12 +136,12 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       nextTimeRemaining = settings.pomodoro.focusDuration * 60;
     }
     
-    set({
-      currentState: nextState,
-      timeRemaining: nextTimeRemaining,
-      elapsedSeconds: 0,
-      isRunning: true, // Continua rodando no próximo estado
-    });
+    update.currentState = nextState;
+    update.timeRemaining = nextTimeRemaining;
+    update.elapsedSeconds = 0;
+    update.isRunning = true;
+    
+    set(update);
   },
   
   tick: () => {
