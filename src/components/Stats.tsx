@@ -937,7 +937,7 @@ export default function Stats() {
                   const inRange = currentDay >= startDate && currentDay <= endDate;
                   
                   // Verificar se começou um novo mês para os rótulos
-                  if (currentDay.getMonth() !== currentMonth && currentDay.getDay() === 0) {
+                  if (currentDay.getMonth() !== currentMonth && inRange) {
                     currentMonth = currentDay.getMonth();
                     const monthName = format(currentDay, 'MMM', { locale: pt });
                     monthLabelsData.push({ 
