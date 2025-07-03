@@ -101,9 +101,19 @@ export default function Pomodoro() {
   };
 
   const handlePomodoroChange = (field: keyof typeof pomodoroForm, value: string) => {
+    if (value === '') {
+      setPomodoroForm(prev => ({ ...prev, [field]: '' }));
+      return;
+    }
     const numericValue = parseInt(value, 10);
     if (!isNaN(numericValue) && numericValue > 0) {
       setPomodoroForm(prev => ({ ...prev, [field]: numericValue }));
+    }
+  };
+
+  const handleBlur = (field: keyof typeof pomodoroForm) => {
+    if (String(pomodoroForm[field]) === '') {
+      setPomodoroForm(prev => ({ ...prev, [field]: 1 }));
     }
   };
 
@@ -168,15 +178,15 @@ export default function Pomodoro() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="focusDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Foco (min)</label>
-            <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            <input type="number" id="focusDuration" value={pomodoroForm.focusDuration} onChange={(e) => handlePomodoroChange('focusDuration', e.target.value)} onBlur={() => handleBlur('focusDuration')} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
           </div>
           <div>
             <label htmlFor="shortBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Curta (min)</label>
-            <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            <input type="number" id="shortBreakDuration" value={pomodoroForm.shortBreakDuration} onChange={(e) => handlePomodoroChange('shortBreakDuration', e.target.value)} onBlur={() => handleBlur('shortBreakDuration')} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
           </div>
           <div>
             <label htmlFor="longBreakDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Pausa Longa (min)</label>
-            <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
+            <input type="number" id="longBreakDuration" value={pomodoroForm.longBreakDuration} onChange={(e) => handlePomodoroChange('longBreakDuration', e.target.value)} onBlur={() => handleBlur('longBreakDuration')} className="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-600 dark:text-white rounded-md shadow-sm p-2"/>
             </div>
           </div>
           <div className="flex items-center gap-4">
