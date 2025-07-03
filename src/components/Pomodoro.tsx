@@ -158,7 +158,7 @@ export default function Pomodoro() {
   const subjectColor = currentSubject?.color || '#a855f7';
   
   return (
-    <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 max-w-md mx-auto">
+    <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 max-w-md lg:max-w-lg mx-auto">
       <div className="w-full flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: subjectColor }}></div>
@@ -201,7 +201,7 @@ export default function Pomodoro() {
         </div>
       )}
 
-    <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center my-6">
+    <div className="relative w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 flex items-center justify-center my-6">
         <svg className="absolute w-full h-full transform -rotate-90">
             <circle
                 cx="50%"
@@ -227,7 +227,7 @@ export default function Pomodoro() {
             />
         </svg>
         <div className="relative text-center">
-            <h1 className="text-5xl sm:text-6xl font-bold text-gray-800 dark:text-gray-100 tabular-nums">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-800 dark:text-gray-100 tabular-nums">
                 {displayMinutes}:{displaySeconds}
             </h1>
             <p className="text-lg text-gray-500 dark:text-gray-400 mt-2">{stateText}</p>
