@@ -16,11 +16,18 @@ export default function Header({ onSettingsClick }: HeaderProps) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Anima o botão "Visão Geral" na primeira renderização para chamar a atenção
+    // Adiciona um brilho sutil ao botão "Visão Geral" na primeira renderização
     const hasSeenAnimation = localStorage.getItem('hasSeenVisionAnimation');
     if (!hasSeenAnimation) {
       setAnimateButton(true);
       localStorage.setItem('hasSeenVisionAnimation', 'true');
+
+      // Remove o brilho após alguns segundos
+      const timer = setTimeout(() => {
+        setAnimateButton(false);
+      }, 4000); // O brilho dura 4 segundos
+
+      return () => clearTimeout(timer); // Limpeza do timer
     }
   }, []);
 
@@ -42,7 +49,7 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors shadow-sm ${animateButton ? 'animate-pulse' : ''}`}
+              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 shadow-sm ${animateButton ? 'ring-2 ring-offset-2 ring-primary-500 dark:ring-offset-gray-900' : 'ring-0'}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
               Visão Geral
@@ -61,7 +68,7 @@ export default function Header({ onSettingsClick }: HeaderProps) {
              <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors shadow-sm ${animateButton ? 'animate-pulse' : ''}`}
+              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 shadow-sm ${animateButton ? 'ring-2 ring-offset-2 ring-primary-500 dark:ring-offset-gray-900' : 'ring-0'}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
               Visão Geral
