@@ -12,7 +12,17 @@ interface HeaderProps {
 
 export default function Header({ onSettingsClick }: HeaderProps) {
   const [showFeaturesModal, setShowFeaturesModal] = useState(false);
+  const [animateButton, setAnimateButton] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    // Anima o botão "Visão Geral" na primeira renderização para chamar a atenção
+    const hasSeenAnimation = localStorage.getItem('hasSeenVisionAnimation');
+    if (!hasSeenAnimation) {
+      setAnimateButton(true);
+      localStorage.setItem('hasSeenVisionAnimation', 'true');
+    }
+  }, []);
 
   return (
     <header className="bg-white dark:bg-gray-900 shadow-sm relative z-20">
@@ -32,10 +42,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className="p-1 rounded-full text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-gray-900 transition-colors duration-150"
+              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors shadow-sm ${animateButton ? 'animate-pulse' : ''}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
-              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              Visão Geral
             </button>
             
             <button
@@ -51,10 +61,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
              <button
               type="button"
               onClick={() => setShowFeaturesModal(true)}
-              className="p-1 rounded-full text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-gray-900 transition-colors duration-150"
+              className={`bg-primary-500 text-white hover:bg-primary-600 dark:hover:bg-primary-400 px-3 py-2 rounded-md text-sm font-medium transition-colors shadow-sm ${animateButton ? 'animate-pulse' : ''}`}
               title="Visão Geral: Descubra as funcionalidades do Studar!"
             >
-              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              Visão Geral
             </button>
             <button
               type="button"
