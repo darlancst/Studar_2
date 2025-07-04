@@ -9,9 +9,6 @@ import { FaPlay, FaPause, FaForward, FaRedo, FaCog } from 'react-icons/fa';
 import { isSameDay } from 'date-fns';
 
 export default function Pomodoro() {
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
-  
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
@@ -33,16 +30,22 @@ export default function Pomodoro() {
     timeRemaining,
     isRunning,
     completedPomodoros,
-    elapsedSeconds,
     lastPomodoroDate,
   } = usePomodoroStore();
 
   const {
     startTimer,
     pauseTimer,
+    resumeTimer,
     resetTimer,
     skipToNext,
+    initWorker,
   } = usePomodoroStore.getState();
+
+  // Inicializa o Web Worker uma vez
+  useEffect(() => {
+    initWorker();
+  }, [initWorker]);
 
   useEffect(() => {
     // Adicionado para resetar a contagem de pomodoros a cada novo dia
@@ -55,68 +58,15 @@ export default function Pomodoro() {
   }, [fetchTopics]);
   
   useEffect(() => {
-    if (!isRunning) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
-
-    intervalRef.current = setInterval(() => {
-      usePomodoroStore.getState().tick();
-    }, 1000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isRunning]);
-
-  useEffect(() => {
-    const manageWakeLock = async () => {
-      if ('wakeLock' in navigator) {
-        if (isRunning) {
-          try {
-            wakeLockRef.current = await navigator.wakeLock.request('screen');
-            console.log('Wake Lock ativado.');
-            wakeLockRef.current.addEventListener('release', () => {
-              console.log('Wake Lock liberado pelo sistema.');
-              wakeLockRef.current = null;
-            });
-          } catch (err: any) {
-            console.error(`Falha ao adquirir Wake Lock: ${err.name}, ${err.message}`);
-          }
-        } else {
-          if (wakeLockRef.current) {
-            await wakeLockRef.current.release();
-            wakeLockRef.current = null;
-            console.log('Wake Lock liberado.');
-          }
-        }
-      } else {
-        console.warn('Wake Lock API não é suportada neste navegador.');
-      }
-    };
-
-    manageWakeLock();
-
-    return () => {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release();
-        wakeLockRef.current = null;
-      }
-    };
-  }, [isRunning]);
-
-  useEffect(() => {
     setPomodoroForm({ ...settings.pomodoro });
   }, [settings.pomodoro]);
 
   const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTopicId = e.target.value || null;
     
+    // Para o timer ao trocar de tópico e reseta o estado
+    resetTimer(false);
+
     usePomodoroStore.setState({ 
       currentTopicId: newTopicId,
       currentState: 'idle',
@@ -139,7 +89,7 @@ export default function Pomodoro() {
           startTimer(currentTopicId);
         }
       } else {
-        usePomodoroStore.setState({ isRunning: true });
+        resumeTimer();
       }
     }
   };

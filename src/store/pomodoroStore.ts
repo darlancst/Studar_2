@@ -21,10 +21,14 @@ interface PomodoroStore {
   // Sessões (do Pomodoro, não do estudo geral)
   sessions: PomodoroSession[];
   
+  worker: Worker | null;
+  initWorker: () => void;
+
   // Ações
   fetchPomodoroData: () => Promise<void>;
   startTimer: (topicId: string) => void;
   pauseTimer: () => void;
+  resumeTimer: () => void;
   resetTimer: (saveProgress: boolean) => void;
   skipToNext: () => void;
   tick: () => void;
@@ -54,8 +58,22 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   completedPomodoros: 0,
   lastPomodoroDate: null,
   elapsedSeconds: 0,
-  
   sessions: [],
+  worker: null,
+
+  initWorker: () => {
+    if (get().worker || typeof window === 'undefined') return;
+    
+    const worker = new Worker('/pomodoro.worker.js');
+
+    worker.onmessage = (e) => {
+      if (e.data.type === 'tick') {
+        get().tick();
+      }
+    };
+
+    set({ worker });
+  },
 
   fetchPomodoroData: async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -89,30 +107,33 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       timeRemaining: settings.pomodoro.focusDuration * 60,
       elapsedSeconds: 0,
     });
+    get().worker?.postMessage({ command: 'start' });
   },
   
   pauseTimer: () => {
+    get().worker?.postMessage({ command: 'stop' });
     set({ isRunning: false });
+  },
+
+  resumeTimer: () => {
+    set({ isRunning: true });
+    get().worker?.postMessage({ command: 'start' });
   },
   
   resetTimer: (saveProgress = false) => {
-    // A lógica de salvar foi movida para a função tick().
-    // Esta função agora apenas reseta o estado do timer.
+    get().worker?.postMessage({ command: 'stop' });
     const { settings } = useSettingsStore.getState();
     set({
       isRunning: false,
       currentState: 'idle',
-      currentTopicId: null,
       timeRemaining: settings.pomodoro.focusDuration * 60,
       elapsedSeconds: 0,
     });
   },
   
   skipToNext: () => {
-    // A lógica de salvar foi movida para a função tick().
-    // Quando uma sessão de foco termina (pulada ou finalizada), apenas avançamos o estado.
-    // Os minutos completos já foram salvos pelo tick.
-    get()._advanceState(); // Avança para o próximo estado (pausa, etc.)
+    get().worker?.postMessage({ command: 'stop' });
+    get()._advanceState();
   },
 
   _advanceState: () => {
@@ -139,17 +160,24 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
         nextState = 'shortBreak';
         nextTimeRemaining = settings.pomodoro.shortBreakDuration * 60;
       }
-    } else { // Se estava em pausa curta ou longa
+    } else { 
       nextState = 'focus';
       nextTimeRemaining = settings.pomodoro.focusDuration * 60;
     }
     
-    playNotificationSound(); // Toca o som ao avançar o estado
+    playNotificationSound();
     
     update.currentState = nextState;
     update.timeRemaining = nextTimeRemaining;
     update.elapsedSeconds = 0;
-    update.isRunning = true;
+    
+    const { currentTopicId } = get();
+    if (currentTopicId) {
+      update.isRunning = true;
+      get().worker?.postMessage({ command: 'start' });
+    } else {
+      update.isRunning = false;
+    }
     
     set(update);
   },
@@ -158,12 +186,11 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     const { timeRemaining, currentState, currentTopicId, isRunning, elapsedSeconds } = get();
 
     if (!isRunning) {
+      get().worker?.postMessage({ command: 'stop' });
       return;
     }
 
-    // Finaliza a sessão se o tempo acabar
     if (timeRemaining <= 1) {
-      // Antes de avançar, verifica se o último segundo completa um minuto que precisa ser salvo.
       const newElapsedSecondsOnFinish = elapsedSeconds + 1;
       if (currentState === 'focus' && currentTopicId && newElapsedSecondsOnFinish > 0 && newElapsedSecondsOnFinish % 60 === 0) {
         get().addSession(currentTopicId, 1);
@@ -174,7 +201,6 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
 
     const newElapsedSeconds = elapsedSeconds + 1;
 
-    // Salva um bloco de 1 minuto toda vez que um minuto de foco se passa.
     if (currentState === 'focus' && currentTopicId && newElapsedSeconds > 0 && newElapsedSeconds % 60 === 0) {
       get().addSession(currentTopicId, 1);
     }
