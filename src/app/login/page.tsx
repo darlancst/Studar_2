@@ -23,6 +23,7 @@ export default function Login() {
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           theme="dark"
+          providers={[]}
           redirectTo="/"
         />
       </div>
