@@ -10,6 +10,7 @@ import { isSameDay } from 'date-fns';
 
 export default function Pomodoro() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -69,6 +70,42 @@ export default function Pomodoro() {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning]);
+
+  useEffect(() => {
+    const manageWakeLock = async () => {
+      if ('wakeLock' in navigator) {
+        if (isRunning) {
+          try {
+            wakeLockRef.current = await navigator.wakeLock.request('screen');
+            console.log('Wake Lock ativado.');
+            wakeLockRef.current.addEventListener('release', () => {
+              console.log('Wake Lock liberado pelo sistema.');
+              wakeLockRef.current = null;
+            });
+          } catch (err: any) {
+            console.error(`Falha ao adquirir Wake Lock: ${err.name}, ${err.message}`);
+          }
+        } else {
+          if (wakeLockRef.current) {
+            await wakeLockRef.current.release();
+            wakeLockRef.current = null;
+            console.log('Wake Lock liberado.');
+          }
+        }
+      } else {
+        console.warn('Wake Lock API não é suportada neste navegador.');
+      }
+    };
+
+    manageWakeLock();
+
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
       }
     };
   }, [isRunning]);
