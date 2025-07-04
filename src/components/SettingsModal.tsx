@@ -14,13 +14,16 @@ import {
   PaintBrushIcon,
   ArrowPathIcon,
   ExclamationTriangleIcon,
-  CheckIcon
+  CheckIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useSettingsStore, HeatmapThresholds } from '@/store/settingsStore';
+import { createClient } from '@/lib/supabase/client';
 
 interface SettingsModalProps {
   onClose: () => void;
 }
+const supabase = createClient();
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -140,6 +143,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     setShowResetConfirm(false);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login'; // Redireciona para a página de login
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-gray-700 bg-opacity-50 dark:bg-black dark:bg-opacity-60 overflow-y-auto flex justify-center items-center">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] overflow-y-auto">
@@ -181,6 +189,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   </>
                 )}
               </button>
+            </div>
+            <div className="mt-4 text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                Desenvolvido por <a href="https://github.com/darlancst" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 hover:underline">darlancst</a>
+                </p>
             </div>
           </div>
           
@@ -477,6 +490,23 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   Esta ação reiniciará todos os dados, incluindo estatísticas, histórico de sessões e contadores.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Seção da Conta */}
+          <div className="pb-4 border-b dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2 text-gray-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Conta</h3>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700 dark:text-gray-300">Sair da sua conta</span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center px-4 py-2 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/30 text-sm"
+              >
+                Sair
+              </button>
             </div>
           </div>
         </div>
