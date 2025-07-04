@@ -37,6 +37,14 @@ interface PomodoroStore {
   getCurrentSessionTime: () => number; // Retorna o tempo da sessão atual em minutos
 }
 
+const playNotificationSound = () => {
+  const audio = new Audio('https://www.orangefreesounds.com/wp-content/uploads/2020/04/Alert-notification.mp3');
+  audio.play().catch(error => {
+    // A reprodução automática pode falhar se o usuário não tiver interagido com a página
+    console.log("Falha ao tocar o som de notificação:", error);
+  });
+};
+
 export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   // Estado inicial
   currentState: 'idle',
@@ -135,6 +143,8 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
       nextState = 'focus';
       nextTimeRemaining = settings.pomodoro.focusDuration * 60;
     }
+    
+    playNotificationSound(); // Toca o som ao avançar o estado
     
     update.currentState = nextState;
     update.timeRemaining = nextTimeRemaining;
