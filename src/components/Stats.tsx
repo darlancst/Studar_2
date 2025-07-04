@@ -408,44 +408,57 @@ export default function Stats() {
   };
   
   // Prepara dados para gráfico de linha (tempo por dia) - SIMPLIFICADO
-  // (Assumindo que getLineChartData era similar ao getBarChartData, vamos criar um similar)
   const getLineChartData = () => {
     const { startDate, endDate } = calculateDateRange();
     const labels: string[] = [];
     const data: number[] = [];
     const filteredSessions = getFilteredPomodoroSessions();
+    const datasets: any[] = []; // Alterado para 'any' para flexibilidade
 
-    // Determina o número de dias baseado no período
-    let daysToShow = 7; // Default para semana
-    if (period === 'month') daysToShow = 30;
-    // Se for 'annual', a lógica precisaria ser mais complexa para agrupar ou limitar
-    // Por enquanto, vamos limitar 'annual' a 30 dias também para este gráfico
-    if (period === 'annual') daysToShow = 30; 
-    if (period === 'today') daysToShow = 1;
-
-    const baseDate = startOfToday();
-    for (let i = daysToShow - 1; i >= 0; i--) {
-      const date = subDays(baseDate, i);
-      labels.push(format(date, 'dd/MM', { locale: pt }));
-      
-      const dayTotal = filteredSessions
-        .filter((session: PomodoroSession) => isSameDay(parseISO(session.date), date))
+    if (period === 'today') {
+      labels.push('Hoje');
+      const todayTotal = filteredSessions
+        .filter((session: PomodoroSession) => isSameDay(parseISO(session.date), new Date()))
         .reduce((total: number, session: PomodoroSession) => total + session.duration, 0);
-      
-      data.push(dayTotal);
+      data.push(todayTotal);
+      datasets.push({
+        label: 'Tempo de estudo (min)',
+        data,
+        backgroundColor: '#8b5cf680', // Cor da barra com opacidade
+        borderColor: '#8b5cf6',
+        borderWidth: 1,
+        maxBarThickness: 100, // Largura máxima da barra
+      });
+    } else {
+      // Determina o número de dias baseado no período
+      let daysToShow = 7; // Default para semana
+      if (period === 'month') daysToShow = 30;
+      if (period === 'annual') daysToShow = 30;
+
+      const baseDate = startOfToday();
+      for (let i = daysToShow - 1; i >= 0; i--) {
+        const date = subDays(baseDate, i);
+        labels.push(format(date, 'dd/MM', { locale: pt }));
+        
+        const dayTotal = filteredSessions
+          .filter((session: PomodoroSession) => isSameDay(parseISO(session.date), date))
+          .reduce((total: number, session: PomodoroSession) => total + session.duration, 0);
+        
+        data.push(dayTotal);
+      }
+      datasets.push({
+        label: 'Tempo de estudo (min)',
+        data,
+        borderColor: '#8b5cf6',
+        backgroundColor: '#8b5cf633', // Área sob a linha
+        tension: 0.3,
+        fill: true,
+      });
     }
     
     return {
       labels,
-      datasets: [
-        {
-          label: 'Tempo de estudo (min)',
-          data,
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgba(255, 99, 132, 0.5)',
-          tension: 0.2,
-        },
-      ],
+      datasets,
     };
   };
   
@@ -600,7 +613,7 @@ export default function Stats() {
   const pieChartData = getPieChartData();
   const lineChartData = getLineChartData();
   
-  const getChartOptions = (chartType: 'pie' | 'line') => {
+  const getChartOptions = (chartType: 'pie' | 'line' | 'bar') => {
     const textColor = isDarkMode ? '#e5e7eb' : '#374151'; // gray-200 : gray-700
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     const tooltipBackgroundColor = isDarkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.8)';
@@ -626,7 +639,7 @@ export default function Stats() {
           cornerRadius: 8,
           padding: 10,
         callbacks: {
-            label: (context: TooltipItem<'pie' | 'line'>) => {
+            label: (context: TooltipItem<'pie' | 'line' | 'bar'>) => {
               if (chartType === 'pie') {
                 const data = context.chart.data.datasets[0].data.filter(v => typeof v === 'number') as number[];
                 const total = data.reduce((acc, val) => acc + val, 0);
@@ -642,30 +655,26 @@ export default function Stats() {
     },
   };
   
-    if (chartType === 'line') {
-      return {
+    if (chartType === 'line' || chartType === 'bar') {
+      const options = {
         ...baseOptions,
         plugins: {
           ...baseOptions.plugins,
           title: {
             display: false,
-            text: `Progresso ${getChartPeriodTitle(period)}`,
-            color: textColor,
-            font: { size: 16, family: 'Inter, sans-serif' },
           },
           legend: {
             display: false,
           },
         },
-    scales: {
+        scales: {
           y: {
-          beginAtZero: true,
+            beginAtZero: true,
             ticks: {
               color: isDarkMode ? '#cbd5e1' : '#4b5563',
               font: {
                 family: 'Inter, sans-serif',
               },
-              // Formata os ticks do eixo Y para mostrar horas/minutos
               callback: function(value: string | number) {
                 if (typeof value === 'number') {
                   return formatTimeForAxis(value);
@@ -678,7 +687,7 @@ export default function Stats() {
               drawBorder: false,
             },
             title: {
-              display: false, // O título já está no card
+              display: false,
             }
           },
           x: {
@@ -686,19 +695,26 @@ export default function Stats() {
             grid: { display: false },
           },
         },
-        elements: {
-          line: {
-            tension: 0.3,
-            borderColor: '#8b5cf6', // primary-500
-            borderWidth: 2,
-          },
-          point: {
-            backgroundColor: '#8b5cf6',
-            radius: 4,
-            hoverRadius: 6,
-          },
-        },
       };
+
+      if (chartType === 'line') {
+        return {
+          ...options,
+          elements: {
+            line: {
+              tension: 0.3,
+              borderColor: '#8b5cf6', // primary-500
+              borderWidth: 2,
+            },
+            point: {
+              backgroundColor: '#8b5cf6',
+              radius: 4,
+              hoverRadius: 6,
+            },
+          },
+        };
+      }
+      return options; // Para o gráfico de barras
     }
 
     return { // Pie chart options
@@ -891,7 +907,11 @@ export default function Stats() {
               Progresso <span className="text-primary-500">{getChartPeriodTitle(period)}</span>
             </h3>
             <div className="flex-grow">
-              <Line data={lineChartData} options={getChartOptions('line')} />
+              {period === 'today' ? (
+                <Bar data={lineChartData} options={getChartOptions('bar')} />
+              ) : (
+                <Line data={lineChartData} options={getChartOptions('line')} />
+              )}
             </div>
         </div>
         
