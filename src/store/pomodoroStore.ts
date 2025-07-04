@@ -16,30 +16,25 @@ interface PomodoroStore {
   timeRemaining: number; // em segundos
   completedPomodoros: number;
   lastPomodoroDate: string | null;
-  
-  // Referência ao Worker
-  worker: Worker | null;
+  elapsedSeconds: number; // segundos decorridos na sessão atual
   
   // Sessões (do Pomodoro, não do estudo geral)
   sessions: PomodoroSession[];
   
   // Ações
   fetchPomodoroData: () => Promise<void>;
-  initializeWorker: () => void;
-  terminateWorker: () => void;
   startTimer: (topicId: string) => void;
   pauseTimer: () => void;
-  resetTimer: () => void;
+  resetTimer: (saveProgress: boolean) => void;
   skipToNext: () => void;
-  updateWorkerSettings: () => void;
-  
-  // Ações internas
-  _advanceState: (previousState: PomodoroState) => void;
+  tick: () => void;
+  _advanceState: () => void;
   
   // Sessões Pomodoro
   addSession: (topicId: string, duration: number) => Promise<void>;
   getSessionsByTopicId: (topicId: string) => PomodoroSession[];
-  getTotalStudyTimeByTopicId: (topicId: string) => number;
+  getTotalStudyTimeByTopicId: (topicId: string) => number; // Tempo total histórico apenas das sessões pomodoro
+  getCurrentSessionTime: () => number; // Retorna o tempo da sessão atual em minutos
 }
 
 const playNotificationSound = () => {
@@ -58,47 +53,9 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   timeRemaining: useSettingsStore.getState().settings.pomodoro.focusDuration * 60,
   completedPomodoros: 0,
   lastPomodoroDate: null,
-  worker: null,
+  elapsedSeconds: 0,
   
   sessions: [],
-
-  initializeWorker: () => {
-    // Evita criar múltiplos workers
-    if (get().worker) return;
-
-    const worker = new Worker('/pomodoro-worker.js');
-
-    worker.onmessage = (e) => {
-      const { type, timeRemaining, finalState } = e.data;
-
-      switch (type) {
-        case 'TICK':
-          set({ timeRemaining });
-          break;
-        case 'MINUTE_COMPLETED':
-          const { currentTopicId } = get();
-          if (currentTopicId) {
-            get().addSession(currentTopicId, 1);
-          }
-          break;
-        case 'CYCLE_ENDED':
-          get()._advanceState(finalState);
-          break;
-      }
-    };
-
-    set({ worker });
-    // Envia as configurações iniciais para o worker
-    get().updateWorkerSettings();
-  },
-
-  terminateWorker: () => {
-    const { worker } = get();
-    if (worker) {
-      worker.terminate();
-      set({ worker: null, isRunning: false });
-    }
-  },
 
   fetchPomodoroData: async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -124,78 +81,56 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   },
   
   startTimer: (topicId) => {
-    const { worker, timeRemaining, isRunning, currentState } = get();
-    if (!worker) return;
-    
-    // Se já estiver rodando, não faz nada
-    if (isRunning) return;
-
-    // Se estiver pausado, retoma.
-    if (currentState !== 'idle') {
-        worker.postMessage({ command: 'RESUME' });
-    } else { // Se estiver 'idle', inicia um novo ciclo de foco.
-        worker.postMessage({ command: 'START' });
-        set({ currentState: 'focus' });
-    }
-    
-    set({ isRunning: true, currentTopicId: topicId });
+    const { settings } = useSettingsStore.getState();
+    set({
+      isRunning: true,
+      currentTopicId: topicId,
+      currentState: 'focus',
+      timeRemaining: settings.pomodoro.focusDuration * 60,
+      elapsedSeconds: 0,
+    });
   },
   
   pauseTimer: () => {
-    const { worker } = get();
-    if (worker) {
-      worker.postMessage({ command: 'PAUSE' });
-      set({ isRunning: false });
-    }
+    set({ isRunning: false });
   },
   
-  resetTimer: () => {
-    const { worker } = get();
+  resetTimer: (saveProgress = false) => {
+    // A lógica de salvar foi movida para a função tick().
+    // Esta função agora apenas reseta o estado do timer.
     const { settings } = useSettingsStore.getState();
-    if (worker) {
-      worker.postMessage({ command: 'RESET', newSettings: settings.pomodoro });
-    }
     set({
       isRunning: false,
       currentState: 'idle',
       currentTopicId: null,
       timeRemaining: settings.pomodoro.focusDuration * 60,
+      elapsedSeconds: 0,
     });
   },
   
   skipToNext: () => {
-    const { worker } = get();
-    if (worker) {
-      worker.postMessage({ command: 'SKIP' });
-      set({ isRunning: false }); // Para a UI imediatamente
-    }
+    // A lógica de salvar foi movida para a função tick().
+    // Quando uma sessão de foco termina (pulada ou finalizada), apenas avançamos o estado.
+    // Os minutos completos já foram salvos pelo tick.
+    get()._advanceState(); // Avança para o próximo estado (pausa, etc.)
   },
 
-  updateWorkerSettings: () => {
-    const { worker } = get();
+  _advanceState: () => {
+    const { currentState, completedPomodoros, lastPomodoroDate } = get();
     const { settings } = useSettingsStore.getState();
-    if (worker) {
-      worker.postMessage({ command: 'UPDATE_SETTINGS', newSettings: settings.pomodoro });
-    }
-  },
-
-  _advanceState: (previousState) => {
-    const { completedPomodoros, lastPomodoroDate, worker } = get();
-    const { settings } = useSettingsStore.getState();
+    const update: Partial<PomodoroStore> = {};
     let nextState: PomodoroState;
     let nextTimeRemaining: number;
 
-    // Apenas incrementa o pomodoro se o ciclo anterior foi de foco
-    if (previousState === 'focus') {
+    if (currentState === 'focus') {
       const today = new Date();
       const lastDate = lastPomodoroDate ? new Date(lastPomodoroDate) : null;
+      
       const isToday = lastDate && isSameDay(today, lastDate);
+      
       const newCompleted = isToday ? completedPomodoros + 1 : 1;
-
-      set({ 
-        completedPomodoros: newCompleted, 
-        lastPomodoroDate: today.toISOString()
-      });
+      update.completedPomodoros = newCompleted;
+      update.lastPomodoroDate = today.toISOString();
 
       if (newCompleted % settings.pomodoro.longBreakInterval === 0) {
         nextState = 'longBreak';
@@ -204,21 +139,49 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
         nextState = 'shortBreak';
         nextTimeRemaining = settings.pomodoro.shortBreakDuration * 60;
       }
-    } else { // Se estava em pausa, volta para o foco
+    } else { // Se estava em pausa curta ou longa
       nextState = 'focus';
       nextTimeRemaining = settings.pomodoro.focusDuration * 60;
     }
     
-    playNotificationSound();
+    playNotificationSound(); // Toca o som ao avançar o estado
     
-    if (worker) {
-        worker.postMessage({ command: 'SET_STATE', state: nextState, time: nextTimeRemaining });
+    update.currentState = nextState;
+    update.timeRemaining = nextTimeRemaining;
+    update.elapsedSeconds = 0;
+    update.isRunning = true;
+    
+    set(update);
+  },
+  
+  tick: () => {
+    const { timeRemaining, currentState, currentTopicId, isRunning, elapsedSeconds } = get();
+
+    if (!isRunning) {
+      return;
     }
 
+    // Finaliza a sessão se o tempo acabar
+    if (timeRemaining <= 1) {
+      // Antes de avançar, verifica se o último segundo completa um minuto que precisa ser salvo.
+      const newElapsedSecondsOnFinish = elapsedSeconds + 1;
+      if (currentState === 'focus' && currentTopicId && newElapsedSecondsOnFinish > 0 && newElapsedSecondsOnFinish % 60 === 0) {
+        get().addSession(currentTopicId, 1);
+      }
+      get().skipToNext();
+      return;
+    }
+
+    const newElapsedSeconds = elapsedSeconds + 1;
+
+    // Salva um bloco de 1 minuto toda vez que um minuto de foco se passa.
+    if (currentState === 'focus' && currentTopicId && newElapsedSeconds > 0 && newElapsedSeconds % 60 === 0) {
+      get().addSession(currentTopicId, 1);
+    }
+    
     set({
-      currentState: nextState,
-      timeRemaining: nextTimeRemaining,
-      isRunning: true,
+      timeRemaining: timeRemaining - 1,
+      elapsedSeconds: newElapsedSeconds,
     });
   },
   
@@ -261,5 +224,11 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
   getTotalStudyTimeByTopicId: (topicId) => {
     const sessions = get().getSessionsByTopicId(topicId);
     return sessions.reduce((total, session) => total + session.duration, 0);
+  },
+  
+  getCurrentSessionTime: () => {
+    const { elapsedSeconds, currentState, currentTopicId, isRunning } = get();
+    if (currentState !== 'focus' || !currentTopicId || !isRunning) return 0;
+    return Math.floor(elapsedSeconds / 60);
   },
 })); 
