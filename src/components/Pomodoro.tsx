@@ -31,6 +31,7 @@ export default function Pomodoro() {
     isRunning,
     completedPomodoros,
     lastPomodoroDate,
+    notificationPermission,
   } = usePomodoroStore();
 
   const {
@@ -40,6 +41,7 @@ export default function Pomodoro() {
     resetTimer,
     skipToNext,
     initWorker,
+    requestNotificationPermission,
   } = usePomodoroStore.getState();
 
   // Inicializa o Web Worker uma vez
@@ -213,6 +215,16 @@ export default function Pomodoro() {
                 Salvar
               </button>
               {showSaveConfirmation && <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">Salvo!</span>}
+            </div>
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+                <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-200 mb-2">Notificações</h3>
+                {notificationPermission === 'default' && (
+                    <button onClick={requestNotificationPermission} className="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        Ativar Notificações
+                    </button>
+                )}
+                {notificationPermission === 'granted' && <span className="text-sm text-gray-600 dark:text-gray-400">As notificações estão ativas.</span>}
+                {notificationPermission === 'denied' && <span className="text-sm text-red-500">As notificações foram bloqueadas. Altere nas configurações do seu navegador.</span>}
             </div>
           </div>
         )}
