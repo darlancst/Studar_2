@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { useTopicStore } from './topicStore';
+import { usePomodoroStore } from './pomodoroStore';
 import { useReviewStore } from './reviewStore';
 import { useSubjectStore } from './subjectStore';
-import { useSessionStore } from './sessionStore';
 import { StudyStats } from '@/types';
 
 interface StatsState {
@@ -13,7 +13,7 @@ interface StatsState {
 export const useStatsStore = create<StatsState>((set, get) => ({
   getStats: (startDate, endDate) => {
     const topicStore = useTopicStore.getState();
-    const sessionStore = useSessionStore.getState();
+    const pomodoroStore = usePomodoroStore.getState();
     const reviewStore = useReviewStore.getState();
     
     // Filtra tópicos por data de criação, se especificado
@@ -26,7 +26,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     });
     
     // Filtra sessões por data, se especificado
-    const sessions = sessionStore.sessions.filter(session => {
+    const sessions = pomodoroStore.sessions.filter(session => {
       if (!startDate && !endDate) return true;
       
       const sessionDate = new Date(session.date);
@@ -60,7 +60,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   
   getStudyTimeBySubject: (startDate, endDate) => {
     const topicStore = useTopicStore.getState();
-    const sessionStore = useSessionStore.getState();
+    const pomodoroStore = usePomodoroStore.getState();
     const subjectStore = useSubjectStore.getState();
     
     // Inicializa o objeto com todas as matérias
@@ -70,7 +70,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     });
     
     // Filtra sessões por data, se especificado
-    const sessions = sessionStore.sessions.filter(session => {
+    const sessions = pomodoroStore.sessions.filter(session => {
       if (!startDate && !endDate) return true;
       
       const sessionDate = new Date(session.date);

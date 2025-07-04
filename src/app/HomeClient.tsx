@@ -15,6 +15,8 @@ import { useTopicStore } from '@/store/topicStore';
 
 import { useReviewStore } from '@/store/reviewStore';
 
+import { usePomodoroStore } from '@/store/pomodoroStore';
+
 import { useSessionStore } from '@/store/sessionStore';
 
 import { useSettingsStore } from '@/store/settingsStore';
@@ -28,6 +30,7 @@ export default function HomeClient() {
   const fetchSubjects = useSubjectStore((state) => state.fetchSubjects);
   const fetchTopics = useTopicStore((state) => state.fetchTopics);
   const fetchReviews = useReviewStore((state) => state.fetchReviews);
+  const fetchPomodoroData = usePomodoroStore((state) => state.fetchPomodoroData);
   const fetchSessions = useSessionStore((state) => state.fetchSessions);
   const { settings, fetchSettings } = useSettingsStore((state) => ({ settings: state.settings, fetchSettings: state.fetchSettings }));
   const fetchStudyDates = useDatesStore((state) => state.fetchStudyDates);
@@ -36,10 +39,11 @@ export default function HomeClient() {
     fetchSubjects();
     fetchTopics();
     fetchReviews();
+    fetchPomodoroData();
     fetchSessions();
     fetchSettings();
     fetchStudyDates();
-  }, [fetchSubjects, fetchTopics, fetchReviews, fetchSessions, fetchSettings, fetchStudyDates]);
+  }, [fetchSubjects, fetchTopics, fetchReviews, fetchPomodoroData, fetchSessions, fetchSettings, fetchStudyDates]);
 
   useEffect(() => {
     if (settings.darkMode) {

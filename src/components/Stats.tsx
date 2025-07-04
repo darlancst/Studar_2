@@ -20,7 +20,6 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useReviewStore } from '@/store/reviewStore';
 import { useDatesStore } from '@/store/datesStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { useSessionStore } from '@/store/sessionStore';
 import { format, subDays, startOfToday, endOfToday, isSameDay, parseISO, startOfDay, startOfWeek, endOfWeek, subYears, addDays, formatISO, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Subject, Review, PomodoroSession, Topic } from '@/types';
@@ -79,11 +78,11 @@ export default function Stats() {
   
   const { getSubjectsWithTopics } = useSubjectStore();
   const { 
+    sessions: pomodoroSessions, 
     isRunning, 
     currentTopicId, 
     elapsedSeconds 
   } = usePomodoroStore();
-  const { sessions: studySessions } = useSessionStore();
   const { reviews } = useReviewStore();
   const { getDates } = useDatesStore();
   
@@ -141,7 +140,7 @@ export default function Stats() {
     //   heatmapScrollRef.current.scrollLeft = 0;
     //   console.log('[HeatmapScroll] Reset scroll to left for desktop view.');
     // }
-  }, [isMobileView, studySessions]); 
+  }, [isMobileView, pomodoroSessions]); 
   
   // Calcula as datas do período selecionado
   const calculateDateRange = (): { startDate: Date; endDate: Date } => {
@@ -245,9 +244,9 @@ export default function Stats() {
   };
   
   // Filtra as sessões Pomodoro pelo período
-  const getFilteredStudySessions = (): PomodoroSession[] => {
+  const getFilteredPomodoroSessions = (): PomodoroSession[] => {
     const { startDate, endDate } = calculateDateRange();
-    return studySessions.filter((session: PomodoroSession) => {
+    return pomodoroSessions.filter((session: PomodoroSession) => {
       const sessionDate = parseISO(session.date); // Converte ISO string para Date
       return sessionDate >= startDate && sessionDate <= endDate;
     });
@@ -274,63 +273,63 @@ export default function Stats() {
   
   // Obtém os dados de sessão por assunto, incluindo sessão Pomodoro ativa
   const getSessionsBySubject = (): Map<string, { time: number; color: string }> => {
-    const subjectsMap = new Map<string, { time: number; color: string }>();
-    const filteredSessions = getFilteredStudySessions();
     const { startDate, endDate } = calculateDateRange();
-    
-    subjects.forEach(subject => {
-      subjectsMap.set(subject.id, { time: 0, color: subject.color });
+
+    const filteredSavedSessions = pomodoroSessions.filter((session: PomodoroSession) => {
+      try {
+        const sessionDate = parseISO(session.date);
+        return sessionDate >= startDate && sessionDate <= endDate;
+      } catch (e) {
+        console.error("Error parsing session date:", e);
+        return false;
+      }
     });
 
-    filteredSessions.forEach((session: PomodoroSession) => {
+    const subjectMap = new Map<string, { time: number; color: string }>();
+
+    subjects.forEach(subject => {
+      subjectMap.set(subject.id, { time: 0, color: subject.color });
+    });
+
+    filteredSavedSessions.forEach((session: PomodoroSession) => {
       const subjectId = findSubjectIdForTopic(session.topicId);
       if (subjectId) {
-        const subjectData = subjectsMap.get(subjectId);
+        const subjectData = subjectMap.get(subjectId);
         if (subjectData) {
-          subjectData.time += session.duration;
+          subjectMap.set(subjectId, { 
+            time: subjectData.time + session.duration,
+            color: subjectData.color 
+          });
         }
       }
     });
 
-    // Adiciona o tempo da sessão atual, se houver
-    if (isRunning && currentTopicId) {
+    // Adiciona o tempo da sessão ativa (pausada ou não)
+    if (currentTopicId && elapsedSeconds > 0) {
       const sessionDate = new Date();
       if (sessionDate >= startDate && sessionDate <= endDate) {
         const subjectId = findSubjectIdForTopic(currentTopicId);
         if (subjectId) {
-          const subjectData = subjectsMap.get(subjectId);
+          const subjectData = subjectMap.get(subjectId);
           if (subjectData) {
             const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
-            subjectData.time += activeSessionMinutes;
+            subjectMap.set(subjectId, {
+              time: subjectData.time + activeSessionMinutes,
+              color: subjectData.color,
+            });
           }
         }
       }
     }
 
-    return subjectsMap;
+    return subjectMap;
   };
   
   // Calcula o tempo total de estudo no período
   const calculateTotalStudyTime = (): number => {
-    const filteredSessions = getFilteredStudySessions();
-    let totalMinutes = filteredSessions.reduce((acc, session) => acc + (session.duration / 60), 0);
-    const { startDate, endDate } = calculateDateRange();
-
-    // Adiciona o tempo da sessão pomodoro atual (se estiver rodando e no período)
-    if (isRunning && currentTopicId) {
-      const sessionDate = new Date();
-      if (sessionDate >= startDate && sessionDate <= endDate) {
-        const subjectId = findSubjectIdForTopic(currentTopicId);
-        if (subjectId) {
-          const subjectData = getSessionsBySubject().get(subjectId);
-          if (subjectData) {
-            const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
-            totalMinutes += activeSessionMinutes;
-          }
-        }
-      }
-    }
-    return Math.round(totalMinutes);
+    const filteredSessions = getFilteredPomodoroSessions();
+    if (filteredSessions.length === 0) return 0;
+    return filteredSessions.reduce((acc, session) => acc + session.duration, 0);
   };
   
   // Conta as revisões completadas no período
@@ -345,32 +344,39 @@ export default function Stats() {
   
   // Calcula a sequência de dias de estudo
   const calculateStudyStreak = (): number => {
-    const studyDates = getDates()
-      .map(dateStr => startOfDay(parseISO(dateStr)))
-      .sort((a, b) => b.getTime() - a.getTime());
+    const dateStrings = getDates();
+    if (dateStrings.length === 0) {
+      return 0;
+    }
 
-    if (studyDates.length === 0) return 0;
+    // 1. Garante datas únicas e as ordena da mais recente para a mais antiga
+    const uniqueDays = Array.from(new Set(dateStrings.map(d => d.split('T')[0])));
+    const sortedDates = uniqueDays.map(d => parseISO(d)).sort((a, b) => b.getTime() - a.getTime());
+
+    if (sortedDates.length === 0) {
+      return 0;
+    }
 
     const today = startOfToday();
-    let streak = 0;
-    
-    // Verifica se o dia mais recente de estudo é hoje ou ontem para manter a sequência
-    const mostRecentStudyDay = studyDates[0];
-    if (isSameDay(mostRecentStudyDay, today) || isSameDay(mostRecentStudyDay, subDays(today, 1))) {
-      streak = 1;
-      let lastDate = mostRecentStudyDay;
-      for (let i = 1; i < studyDates.length; i++) {
-        const currentDate = studyDates[i];
-        if (differenceInCalendarDays(lastDate, currentDate) === 1) {
-          streak++;
-          lastDate = currentDate;
-        } else if (differenceInCalendarDays(lastDate, currentDate) > 1) {
-          break; // A sequência foi quebrada
-        }
-        // Se a diferença for 0, é o mesmo dia, ignora.
-      }
+    const mostRecentDay = sortedDates[0];
+
+    // 2. A sequência só é válida se o último estudo foi hoje ou ontem
+    if (differenceInCalendarDays(today, mostRecentDay) > 1) {
+      return 0;
     }
-    
+
+    let streak = 1;
+    // 3. Itera pelas datas para encontrar dias consecutivos
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const currentDay = sortedDates[i];
+      const previousDay = sortedDates[i + 1];
+      
+      if (differenceInCalendarDays(currentDay, previousDay) !== 1) {
+        break; // A sequência foi quebrada
+      }
+      streak++;
+    }
+
     return streak;
   };
 
@@ -407,7 +413,7 @@ export default function Stats() {
     const { startDate, endDate } = calculateDateRange();
     const labels: string[] = [];
     const data: number[] = [];
-    const filteredSessions = getFilteredStudySessions();
+    const filteredSessions = getFilteredPomodoroSessions();
 
     // Determina o número de dias baseado no período
     let daysToShow = 7; // Default para semana
@@ -445,83 +451,104 @@ export default function Stats() {
   
   // Calcula o tempo total de estudo na semana atual - SIMPLIFICADO
   const calculateWeeklyStudyTime = (): number => {
+    // Obtém o período da semana atual (Domingo a Sábado)
     const today = new Date();
-    const start = startOfWeek(today, { weekStartsOn: 1 }); // Semana começa na segunda
-    const end = endOfWeek(today, { weekStartsOn: 1 });
-
-    const weeklySessions = studySessions.filter(session => {
+    const weekStart = startOfWeek(today, { weekStartsOn: 0 }); 
+    const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+    
+    // Filtra todas as sessões pela semana atual
+    const weeklySessions = pomodoroSessions.filter((session: PomodoroSession) => {
       const sessionDate = parseISO(session.date);
-      return sessionDate >= start && sessionDate <= end;
+      return sessionDate >= weekStart && sessionDate <= weekEnd;
     });
-
-    let totalMinutes = weeklySessions.reduce((acc, session) => acc + (session.duration / 60), 0);
-
-    // Adiciona o tempo da sessão pomodoro atual (se estiver rodando e na semana atual)
-    if (isRunning && currentTopicId) {
-      const sessionDate = new Date();
-      if (sessionDate >= start && sessionDate <= end) {
-        const subjectId = findSubjectIdForTopic(currentTopicId);
-        if (subjectId) {
-          const subjectData = getSessionsBySubject().get(subjectId);
-          if (subjectData) {
-            const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
-            totalMinutes += activeSessionMinutes;
-          }
-        }
-      }
-    }
-
-    return Math.round(totalMinutes);
+    
+    // Soma todas as sessões da semana
+    const weeklyTotal = weeklySessions.reduce((total: number, session: PomodoroSession) => 
+      total + session.duration, 0);
+    
+    return weeklyTotal;
   };
   
   // Prepara os dados para o heatmap
   const getHeatMapData = () => {
-    const yearAgo = subYears(startOfToday(), 1);
-    const dailyData: { [key: string]: number } = {};
-  
-    // Inicializa todos os dias do último ano com 0 minutos
-    for (let i = 0; i <= 365; i++) {
-      const date = formatISO(addDays(yearAgo, i), { representation: 'date' });
-      dailyData[date] = 0;
-    }
-  
-    // Preenche com dados de sessões de estudo
-    studySessions.forEach(session => {
-      const dateStr = format(parseISO(session.date), 'yyyy-MM-dd');
-      if (dailyData[dateStr] !== undefined) {
-        dailyData[dateStr] += session.duration / 60;
+    // 1. Cria uma lista unificada de todas as sessões, incluindo a ativa.
+    const allSessions: PomodoroSession[] = [...pomodoroSessions];
+
+    if (currentTopicId && elapsedSeconds > 0) {
+      const activeMinutes = Math.floor(elapsedSeconds / 60);
+      if (activeMinutes > 0) {
+        allSessions.push({
+          id: 'active-session',
+          topicId: currentTopicId,
+          duration: activeMinutes,
+          date: new Date().toISOString(), // Usar ISO string para consistência
+        });
       }
-    });
-  
-    // Adiciona o tempo da sessão atual
-    if (isRunning && currentTopicId) {
-      const sessionDate = new Date();
-      const dateStr = format(sessionDate, 'yyyy-MM-dd');
-      dailyData[dateStr] += Math.floor(elapsedSeconds / 60);
     }
-  
-    return Object.entries(dailyData).map(([date, minutes]) => ({
-      date: date,
-      minutes: Math.round(minutes),
-      content: `${format(parseISO(date), "dd 'de' MMMM, yyyy", { locale: pt })}: ${formatStudyTime(minutes)}`
-    }));
+    
+    // 2. Processa a lista unificada para criar o mapa de duração.
+    const dateDurationMap = new Map<string, number>();
+    for (const session of allSessions) {
+      if (!session.date || session.duration == null) continue;
+      try {
+        // Usa a data do ISO string diretamente como chave (YYYY-MM-DD)
+        const dateStr = session.date.split('T')[0];
+        const currentDuration = dateDurationMap.get(dateStr) || 0;
+        dateDurationMap.set(dateStr, currentDuration + session.duration);
+      } catch (error) {
+        console.error("Erro ao processar data da sessão para heatmap:", session.date, error);
+      }
+    }
+
+    // 3. Converte para o formato final do heatmap.
+    const heatmapData = Array.from(dateDurationMap.entries())
+      .filter(([date, totalMinutes]) => totalMinutes > 0)
+      .map(([date, totalMinutes]) => {
+        let formattedDate = date;
+        let formattedTime = `${totalMinutes} min`;
+        try {
+          const parsedDate = parseISO(date);
+          formattedDate = format(parsedDate, "dd 'de' MMMM, yyyy", { locale: pt });
+          formattedTime = formatStudyTime(totalMinutes);
+        } catch (error) {
+          console.error("Erro ao formatar data/hora do heatmap:", date, totalMinutes, error);
+        }
+
+        return {
+          date,
+          count: totalMinutes,
+          content: `${formattedDate}: ${formattedTime} de estudo`
+        };
+      });
+      
+    return heatmapData;
   };
   
   // Função para buscar atividades de uma data específica
   const getActivitiesForDate = (date: Date): DailyActivity[] => {
-    const start = startOfDay(date);
-    const end = endOfDay(date);
-
-    const daySessions = studySessions.filter(session => 
+    const activities: DailyActivity[] = [];
+    
+    // Buscar Sessões Pomodoro
+    const daySessions = pomodoroSessions.filter(session => 
       isSameDay(parseISO(session.date), date)
     );
-
+    activities.push(...daySessions);
+    
+    // Buscar Revisões (concluídas ou agendadas para o dia)
     const dayReviews = reviews.filter(review => {
       const reviewDate = review.completed && review.date ? new Date(review.date) : new Date(review.scheduledDate);
       return isSameDay(reviewDate, date);
     });
+    activities.push(...dayReviews);
+    
+    // Ordenar por data/hora (opcional, mas útil)
+    activities.sort((a, b) => {
+        const dateA = (a as PomodoroSession).date || (a as Review).date || (a as Review).scheduledDate;
+        const dateB = (b as PomodoroSession).date || (b as Review).date || (b as Review).scheduledDate;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
 
-    return [...daySessions, ...dayReviews];
+    return activities;
   };
   
   // Handler para clique na célula
@@ -916,7 +943,7 @@ export default function Stats() {
 
               // Obter dados de atividade (minutos por dia)
               const activityMap = new Map<string, number>(
-                heatmapData.map(item => [item.date, item.minutes])
+                heatmapData.map(item => [item.date, item.count])
               );
 
               // Gerar TODOS os dias do período (um ano completo)
