@@ -304,24 +304,6 @@ export default function Stats() {
       }
     });
 
-    // Adiciona o tempo da sessão ativa (pausada ou não)
-    if (currentTopicId && elapsedSeconds > 0) {
-      const sessionDate = new Date();
-      if (sessionDate >= startDate && sessionDate <= endDate) {
-        const subjectId = findSubjectIdForTopic(currentTopicId);
-        if (subjectId) {
-          const subjectData = subjectMap.get(subjectId);
-          if (subjectData) {
-            const activeSessionMinutes = Math.floor(elapsedSeconds / 60);
-            subjectMap.set(subjectId, {
-              time: subjectData.time + activeSessionMinutes,
-              color: subjectData.color,
-            });
-          }
-        }
-      }
-    }
-
     return subjectMap;
   };
   
@@ -473,18 +455,6 @@ export default function Stats() {
   const getHeatMapData = () => {
     // 1. Cria uma lista unificada de todas as sessões, incluindo a ativa.
     const allSessions: PomodoroSession[] = [...pomodoroSessions];
-
-    if (currentTopicId && elapsedSeconds > 0) {
-      const activeMinutes = Math.floor(elapsedSeconds / 60);
-      if (activeMinutes > 0) {
-        allSessions.push({
-          id: 'active-session',
-          topicId: currentTopicId,
-          duration: activeMinutes,
-          date: new Date().toISOString(), // Usar ISO string para consistência
-        });
-      }
-    }
     
     // 2. Processa a lista unificada para criar o mapa de duração.
     const dateDurationMap = new Map<string, number>();
